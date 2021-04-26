@@ -89,34 +89,61 @@ void *read_edges(std::string bin_name, int k) {
   while (EOF != (ch = getc(infile)))
     if ('\n' == ch)
       ++number_of_lines;
-  std::cout << number_of_lines << std::endl;
+  ++number_of_lines;
+  // std::cout << number_of_lines << " lines" << std::endl;
   fclose(infile);
-  // std::cout << "counted no of lines" << std::endl;
 
   // read the first line, set it to no vertices.
   std::ifstream bp(bin_name);
   int *no_vertices = new int;
   std::string line;
-  std::getline(bp, line);
-  *no_vertices = std::stoi(line);
 
-  int no_edges = (number_of_lines)*2; // bidirectional
-  // if file ended with \n you'd subtract 1.
-  std::cout << "allocating A: " << sizeof(std::vector<int>) * *no_vertices
-            << "bytes. " << *no_vertices << " vectors." << std::endl;
-
-  std::vector<int> *A = new std::vector<int>[*no_vertices];
-  // std::cout << "allocated A" << std::endl;
-  int i, j;
+  int i, j, max = 0;
   for (int iter = 0; iter < number_of_lines; iter++) {
     std::getline(bp, line);
     std::istringstream myss(line);
     if (!(myss >> i >> j)) {
       break;
     }
+    if (i > max)
+      max = i;
+    if (j > max)
+      max = j;
+  }
+  bp.clear();
+  bp.seekg(0);
+  *no_vertices = max + 1;
+  int no_edges = (number_of_lines)*2; // bidirectional
+  // if file ended with \n you'd keep it as is.
+  // std::cout << "allocating A: " << sizeof(std::vector<int>) * *no_vertices
+  //          << "bytes. " << *no_vertices << " vectors." << std::endl;
+
+  std::vector<int> *A = new std::vector<int>[*no_vertices];
+  // std::cout << "allocated A" << std::endl;
+
+  for (int iter = 0; iter < number_of_lines; iter++) {
+    std::getline(bp, line);
+    std::istringstream myss(line);
+    if (!(myss >> i >> j)) {
+      break;
+    }
+    // ignore diagonal edges
+    // you may also have 3 1 and 1 3
     // std::cout << i << " " << j << std::endl;
-    A[i].push_back(j);
-    A[j].push_back(i);
+    if (i != j) {
+      A[i].push_back(j);
+      A[j].push_back(i);
+    }
+  }
+  for (int i = 0; i < *no_vertices; i++) {
+    std::sort(A[i].begin(), A[i].end());
+    // sort then unique.
+    std::vector<int>::iterator ip;
+    // using default comparison:
+    std::vector<int>::iterator it;
+    it = std::unique(A[i].begin(), A[i].end());   // 10 20 30 20 10 ?  ?  ?  ?
+                                                  //                ^
+    A[i].resize(std::distance(A[i].begin(), it)); // 10 20 30 20 10
   }
   int sum = 0;
   int *xadj = new int[*no_vertices + 1]; // last one marks the end of the adj.
@@ -131,6 +158,7 @@ void *read_edges(std::string bin_name, int k) {
     sum += A[i].size();
     xadj[i + 1] = sum;
   }
+  std::cout << "Done reading." << std::endl;
   parallel_k_cycles(xadj, adj, no_vertices, k);
   return nullptr;
 }

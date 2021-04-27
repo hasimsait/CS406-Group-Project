@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <deque>
 #include <fstream>
 #include <iostream>
 #include <math.h> /* fabs */
@@ -9,6 +10,13 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+
+struct queue_element {
+  std::vector<int> prev_vertices;
+  int k;
+  int curr_vertex;
+  int start;
+};
 
 // if vertex's neighbors include start
 /* TARGET, quoting from Kamer hoca's mail:
@@ -49,8 +57,53 @@ bool contains(int *array, int start, int end, int item) {
   return false;
 }
 
+void BFS(int *xadj, int *adj, int *nov, std::vector<int> prev_vertices, int k,
+         int curr_vertex, int start, int &ct, std::deque<queue_element> &work) {
+  // this has a memory issue.
+  if (k == 0) {
+    if (contains(adj, xadj[curr_vertex], xadj[curr_vertex + 1], start)) {
+      // if vertex's neighbors include start
+      ct++;
+    }
+  }
+  for (int j = xadj[curr_vertex]; j < xadj[curr_vertex + 1]; j++)
+    if (std::find(prev_vertices.begin(), prev_vertices.end(), curr_vertex) ==
+        prev_vertices.end())
+    // prev vertices do not include curr_vertex)
+    {
+      struct queue_element newelem;
+      std::vector<int> cp = prev_vertices;
+      cp.push_back(curr_vertex);
+      newelem.prev_vertices = cp;
+      newelem.k = k - 1;
+      newelem.curr_vertex = j;
+      newelem.start = start;
+      work.push_back(newelem);
+    }
+}
+void BFS_driver(int *xadj, int *adj, int *nov, int k) {
+  std::deque<queue_element> work;
+  int count = 0;
+
+  for (int i = 0; i < *nov; i++) {
+    struct queue_element newelem;
+    std::vector<int> cp;
+    newelem.prev_vertices = cp;
+    newelem.k = k - 1;
+    newelem.curr_vertex = i;
+    newelem.start = i;
+    work.push_back(newelem);
+  }
+  while (!work.empty()) {
+    BFS(xadj, adj, nov, work.front().prev_vertices, work.front().k,
+        work.front().curr_vertex, work.front().start, count, work);
+    work.pop_front();
+  }
+  std::cout << count << std::endl;
+}
+
 void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
-         int start, int *count) {
+         int start, int &count) {
   /*this should've worked*/
   /*
   marked[vertex] = true;
@@ -82,7 +135,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
     // Check if vertex vert can end with
     // vertex start
     if (contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
-      (*count)++;
+      (count)++;
       return;
     } else
       return;
@@ -140,17 +193,19 @@ int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
   }
   // Searching for cycle by using v-n+1 vertices
   int ct = 0;
-  int *count = &ct;
+  // int *count = &ct;
   for (int i = 0; i < *nov - (k - 1); i++) {
-    DFS(xadj, adj, nov, marked, k - 1, i, i, count);
+    DFS(xadj, adj, nov, marked, k - 1, i, i, ct);
+    // DFS(graph,marked,3,0,0,0)->DFS(graph,marked,3,1,1,value of
+    // ct)->DFS(graph,marked,3,2,2,value of ct)
 
     // ith vertex is marked as visited and
     // will not be visited again.
     marked[i] = true;
   }
   /*the contributes line mentions this*/
-  std::cout << (*count / 2) * k << std::endl;
-  return (*count / 2) * k;
+  std::cout << (ct / 2) * k << std::endl;
+  return (ct / 2) * k;
 }
 
 /*Read the given file and return CSR*/
@@ -237,7 +292,8 @@ void *read_edges(std::string bin_name, int k) {
     xadj[i + 1] = sum;
   }
   std::cout << "Done reading." << std::endl;
-  sequential_k_cycles(xadj, adj, no_vertices, k);
+  // sequential_k_cycles(xadj, adj, no_vertices, k);
+  // BFS_driver(xadj, adj, no_vertices, k);
   return nullptr;
 }
 

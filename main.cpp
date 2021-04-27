@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+// if vertex's neighbors include start
 /* TARGET, quoting from Kamer hoca's mail:
 "In the course project, you will be given an undirected graph G and a number k.
 A graph G = (V, E) has its set of vertices in V and its set of edges in E. The
@@ -24,35 +25,23 @@ and a CUDA-based GPU version and show the speedups with explanations. In
 addition, if you can get speedup over the GPU-based version by using both CPU
 and GPU you will receive bonus points.
 
-Each graph file will contain m+1 lines where m is the number of edges in the
+Each graph file will contain m lines where m is the number of edges in the
 graph. Each file will contain the following information.
 
-    no_vertices
     u1 v1
     u2 v2
     ....
     um jm
 
-In the file, for each line ui < vi. You need to add the other orientation to the
-CSR data structure. The program will be executed as
+You need to add the other orientation to the CSR data structure. The program
+will be executed as
 
 ./executable path_to_file k"
 */
 
 /*proposed DFS:
   function DFS(graph, marked, k, vertex, start, count)
-    marked[vertex] = True
-    if(k == 0)
-      marked[vertex] = False
-      if(vertex and start are adjacent)
-        count +=1
-      return count
-    for all v in V adjacent to vertex
-      if(!marked[v])
-        count = DFS(graph, marked, k-1, v, start, count)
-    marked[vertex] = False
-    return count
-
+  ???
   let  marked be  boolean array of size V
   for k <- 3 to 5
     for v <- 0 to V
@@ -62,6 +51,35 @@ CSR data structure. The program will be executed as
       count = DFS(graph,marked,k-1,v,v,count)
       marked[v] = True
 */
+/*returns true if array contains item within [start,end)*/
+bool contains(int *array, int start, int end, int item) {
+  /*TODO array[start] to array[end] is sorted, switch to binary search*/
+  for (int j = start; j < end; j++) {
+    if (array[j] == item)
+      return true;
+  }
+  return false;
+}
+
+int DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
+        int start, int count) {
+  marked[vertex] = true;
+  if (k == 0) {
+    marked[vertex] = false;
+    if (contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
+      // if vertex's neighbors include start
+      count++;
+    }
+    return count;
+  }
+  for (int j = xadj[vertex]; j < xadj[vertex + 1]; j++) {
+    if (!marked[adj[j]])
+      count = DFS(xadj, adj, nov, marked, k - 1, vertex, start, count);
+  }
+  marked[vertex] = false;
+  return count;
+}
+
 void parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
   /*ADJ AND XADJ ARE CORRECT, UNCOMMENT TO VERIFY.*/
   /*

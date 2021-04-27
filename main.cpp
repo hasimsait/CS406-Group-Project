@@ -11,41 +11,14 @@
 #include <string>
 #include <vector>
 
-struct queue_element {
+struct work {
+  // previous vertices in this path. k max is 5 anyways.
   std::vector<int> prev_vertices;
+  // number of vertices that will be added to this path
   int k;
+  // the vertex that we're adding to this path in this branch
   int curr_vertex;
-  int start;
 };
-
-// if vertex's neighbors include start
-/* TARGET, quoting from Kamer hoca's mail:
-"In the course project, you will be given an undirected graph G and a number k.
-A graph G = (V, E) has its set of vertices in V and its set of edges in E. The
-edges are undirected. That is if {u, v} is in E then u is connected to v, and v
-is also connected to u. For a given G and a positive integer 2 < k < 6, your
-program must find the number of length k cycles containing the vertex u for each
-u in V. For instance, u-v-x-u is a length-3 cycle which will contribute to the
-final value of u, v, and x if k is 3.
-
-You will implement a sequential version, an OpenMP-based multicore CPU version,
-and a CUDA-based GPU version and show the speedups with explanations. In
-addition, if you can get speedup over the GPU-based version by using both CPU
-and GPU you will receive bonus points.
-
-Each graph file will contain m lines where m is the number of edges in the
-graph. Each file will contain the following information.
-
-    u1 v1
-    u2 v2
-    ....
-    um jm
-
-You need to add the other orientation to the CSR data structure. The program
-will be executed as
-
-./executable path_to_file k"
-*/
 
 /*returns true if array contains item within [start,end)*/
 bool contains(int *array, int start, int end, int item) {
@@ -57,53 +30,54 @@ bool contains(int *array, int start, int end, int item) {
   return false;
 }
 
-void BFS(int *xadj, int *adj, int *nov, std::vector<int> prev_vertices, int k,
-         int curr_vertex, int start, int &ct, std::deque<queue_element> &work) {
-  // std::cout << "running bfs on " << k << " " << curr_vertex << " " << start
-  // << std::endl;
-  if (k == 0) {
-    if (contains(adj, xadj[curr_vertex], xadj[curr_vertex + 1], start)) {
+void BFS(int *xadj, int *adj, int *nov, work curr, int &ct,
+         std::deque<work> &work_queue) {
+#ifdef DEBUG
+  std::cout << "running bfs on " << curr.k << " " << curr.curr_vertex
+            << std::endl;
+#endif
+  if (curr.k == 0) {
+    if (contains(adj, xadj[curr.curr_vertex], xadj[curr.curr_vertex + 1],
+                 curr.prev_vertices[0])) {
       // if vertex's neighbors include start
       ct++;
-      /*
+#ifdef DEBUG
       std::cout << "added one loop!" << std::endl;
-      for (int i = 0; i < prev_vertices.size(); ++i)
-        std::cout << prev_vertices[i] << ' ';
-      std::cout << curr_vertex << std::endl;
-      */
+      for (int i = 0; i < curr.prev_vertices.size(); ++i)
+        std::cout << curr.prev_vertices[i] << ' ';
+      std::cout << curr.curr_vertex << std::endl;
+#endif
     }
   }
-  for (int j = xadj[curr_vertex]; j < xadj[curr_vertex + 1]; j++)
-    if (std::find(prev_vertices.begin(), prev_vertices.end(), adj[j]) ==
-            prev_vertices.end() &&
-        k != 0)
+  for (int j = xadj[curr.curr_vertex]; j < xadj[curr.curr_vertex + 1]; j++)
+    if (std::find(curr.prev_vertices.begin(), curr.prev_vertices.end(),
+                  adj[j]) == curr.prev_vertices.end() &&
+        curr.k != 0)
     // prev vertices do not include the neighbor we're attempting to insert)
     {
-      struct queue_element newelem;
-      newelem.prev_vertices = prev_vertices;
-      newelem.prev_vertices.push_back(curr_vertex);
-      newelem.k = k - 1;
-      newelem.curr_vertex = adj[j];
-      newelem.start = start;
-      work.push_back(newelem);
+      struct work new_work;
+      new_work.prev_vertices = curr.prev_vertices;
+      new_work.prev_vertices.push_back(curr.curr_vertex);
+      new_work.k = curr.k - 1;
+      new_work.curr_vertex = adj[j];
+      work_queue.push_back(new_work);
     }
 }
+
 void BFS_driver(int *xadj, int *adj, int *nov, int k) {
-  std::deque<queue_element> work;
+  std::deque<work> work;
   int count = 0;
 
   for (int i = 0; i < *nov; i++) {
-    struct queue_element newelem;
+    struct work new_work;
     std::vector<int> cp;
-    newelem.prev_vertices = cp;
-    newelem.k = k - 1;
-    newelem.curr_vertex = i;
-    newelem.start = i;
-    work.push_back(newelem);
+    new_work.prev_vertices = cp;
+    new_work.k = k - 1;
+    new_work.curr_vertex = i;
+    work.push_back(new_work);
   }
   while (!work.empty()) {
-    BFS(xadj, adj, nov, work.front().prev_vertices, work.front().k,
-        work.front().curr_vertex, work.front().start, count, work);
+    BFS(xadj, adj, nov, work.front(), count, work);
     work.pop_front();
   }
   std::cout << "Total cycles of length " << k << " are " << count / 2
@@ -228,7 +202,9 @@ void *read_edges(std::string bin_name, int k) {
     if ('\n' == ch)
       ++number_of_lines;
   ++number_of_lines;
-  // std::cout << number_of_lines << " lines" << std::endl;
+#ifdef DEBUG
+  std::cout << number_of_lines << " lines" << std::endl;
+#endif
   fclose(infile);
 
   // read the first line, set it to no vertices.
@@ -268,10 +244,12 @@ void *read_edges(std::string bin_name, int k) {
     if (!(myss >> i >> j)) {
       break;
     }
-    // ignore diagonal edges
-    // you may also have 3 1 and 1 3
-    // std::cout << i << " " << j << std::endl;
+
+#ifdef DEBUG
+    std::cout << i << " " << j << std::endl;
+#endif
     if (i != j) {
+      // ignore diagonal edges
       A[i].push_back(j);
       A[j].push_back(i);
     }
@@ -279,6 +257,9 @@ void *read_edges(std::string bin_name, int k) {
   for (int i = 0; i < *no_vertices; i++) {
     std::sort(A[i].begin(), A[i].end());
     // sort then unique.
+    // you may have 3 1 and 1 3
+    // if you do not sort, unique doesn't do what I think it would.
+    // also we prefer them sorted in case the file has 1 2 before 1 0 or sth.
     std::vector<int>::iterator ip;
     // using default comparison:
     std::vector<int>::iterator it;

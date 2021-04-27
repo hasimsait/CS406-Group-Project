@@ -39,18 +39,6 @@ will be executed as
 ./executable path_to_file k"
 */
 
-/*proposed DFS:
-  function DFS(graph, marked, k, vertex, start, count)
-  ???
-  let  marked be  boolean array of size V
-  for k <- 3 to 5
-    for v <- 0 to V
-      marked[v] = False
-    let count = 0
-    for v <- 0 to V-(k-1)
-      count = DFS(graph,marked,k-1,v,v,count)
-      marked[v] = True
-*/
 /*returns true if array contains item within [start,end)*/
 bool contains(int *array, int start, int end, int item) {
   /*TODO array[start] to array[end] is sorted, switch to binary search*/
@@ -61,8 +49,10 @@ bool contains(int *array, int start, int end, int item) {
   return false;
 }
 
-int DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
-        int start, int count) {
+void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
+         int start, int *count) {
+  /*this should've worked*/
+  /*
   marked[vertex] = true;
   if (k == 0) {
     marked[vertex] = false;
@@ -78,9 +68,39 @@ int DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
   }
   marked[vertex] = false;
   return count;
+  */
+  // mark the vertex vert as visited
+  marked[vertex] = true;
+
+  // if the path of length (n-1) is found
+  if (k == 0) {
+
+    // mark vert as un-visited to make
+    // it usable again.
+    marked[vertex] = false;
+
+    // Check if vertex vert can end with
+    // vertex start
+    if (contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
+      (*count)++;
+      return;
+    } else
+      return;
+  }
+
+  // For searching every possible path of
+  // length (n-1)
+  for (int j = xadj[vertex]; j < xadj[vertex + 1]; j++)
+    if (!marked[adj[j]])
+      // DFS for searching path by decreasing length by 1
+      DFS(xadj, adj, nov, marked, k - 1, vertex, start, count);
+
+  // marking vert as unvisited to make it
+  // usable again.
+  marked[vertex] = false;
 }
 
-void parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
+int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
   /*ADJ AND XADJ ARE CORRECT, UNCOMMENT TO VERIFY.*/
   /*
   for (int i = 0; i < *nov + 1; i++) {
@@ -94,6 +114,43 @@ void parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
   }
   */
   // TODO OPEN_MP IMPLEMENTATION OF THE DFS THAT WAS PROPOSED
+  return 0;
+}
+int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
+  /* this should've worked*/
+  /*
+  bool *marked = new bool[*nov];
+  for (int i = 0; i < *nov; i++) {
+    marked[i] = false;
+  }
+  int count = 0;
+  for (int i = 0; i < *nov - (k - 1); i++) {
+    count = DFS(xadj, adj, nov, marked, k - 1, i, i, count);
+    marked[i] = true;
+  }
+  // the contribute line mentons this
+  std::cout << (count / 2) * k << " loops" << std::endl;
+  return (count / 2) * k;*/
+
+  // all vertex are marked un-visited initially.
+  bool *marked = new bool[*nov];
+
+  for (int i = 0; i < *nov; i++) {
+    marked[i] = false;
+  }
+  // Searching for cycle by using v-n+1 vertices
+  int ct = 0;
+  int *count = &ct;
+  for (int i = 0; i < *nov - (k - 1); i++) {
+    DFS(xadj, adj, nov, marked, k - 1, i, i, count);
+
+    // ith vertex is marked as visited and
+    // will not be visited again.
+    marked[i] = true;
+  }
+  /*the contributes line mentions this*/
+  std::cout << (*count / 2) * k << std::endl;
+  return (*count / 2) * k;
 }
 
 /*Read the given file and return CSR*/
@@ -132,6 +189,9 @@ void *read_edges(std::string bin_name, int k) {
   bp.seekg(0);
   *no_vertices = max + 1;
   int no_edges = (number_of_lines)*2; // bidirectional
+  /*TODO unique and no loop decreases this, we should resize adj accordingly.
+   * Not the end of the world, we will never reach those indices.*/
+
   // if file ended with \n you'd keep it as is.
   // std::cout << "allocating A: " << sizeof(std::vector<int>) * *no_vertices
   //          << "bytes. " << *no_vertices << " vectors." << std::endl;
@@ -177,7 +237,7 @@ void *read_edges(std::string bin_name, int k) {
     xadj[i + 1] = sum;
   }
   std::cout << "Done reading." << std::endl;
-  parallel_k_cycles(xadj, adj, no_vertices, k);
+  sequential_k_cycles(xadj, adj, no_vertices, k);
   return nullptr;
 }
 

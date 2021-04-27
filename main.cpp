@@ -59,24 +59,31 @@ bool contains(int *array, int start, int end, int item) {
 
 void BFS(int *xadj, int *adj, int *nov, std::vector<int> prev_vertices, int k,
          int curr_vertex, int start, int &ct, std::deque<queue_element> &work) {
-  // this has a memory issue.
+  // std::cout << "running bfs on " << k << " " << curr_vertex << " " << start
+  // << std::endl;
   if (k == 0) {
     if (contains(adj, xadj[curr_vertex], xadj[curr_vertex + 1], start)) {
       // if vertex's neighbors include start
       ct++;
+      /*
+      std::cout << "added one loop!" << std::endl;
+      for (int i = 0; i < prev_vertices.size(); ++i)
+        std::cout << prev_vertices[i] << ' ';
+      std::cout << curr_vertex << std::endl;
+      */
     }
   }
   for (int j = xadj[curr_vertex]; j < xadj[curr_vertex + 1]; j++)
-    if (std::find(prev_vertices.begin(), prev_vertices.end(), curr_vertex) ==
-        prev_vertices.end())
-    // prev vertices do not include curr_vertex)
+    if (std::find(prev_vertices.begin(), prev_vertices.end(), adj[j]) ==
+            prev_vertices.end() &&
+        k != 0)
+    // prev vertices do not include the neighbor we're attempting to insert)
     {
       struct queue_element newelem;
-      std::vector<int> cp = prev_vertices;
-      cp.push_back(curr_vertex);
-      newelem.prev_vertices = cp;
+      newelem.prev_vertices = prev_vertices;
+      newelem.prev_vertices.push_back(curr_vertex);
       newelem.k = k - 1;
-      newelem.curr_vertex = j;
+      newelem.curr_vertex = adj[j];
       newelem.start = start;
       work.push_back(newelem);
     }
@@ -99,7 +106,8 @@ void BFS_driver(int *xadj, int *adj, int *nov, int k) {
         work.front().curr_vertex, work.front().start, count, work);
     work.pop_front();
   }
-  std::cout << count << std::endl;
+  std::cout << "Total cycles of length " << k << " are " << count / 2
+            << std::endl;
 }
 
 void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
@@ -293,7 +301,7 @@ void *read_edges(std::string bin_name, int k) {
   }
   std::cout << "Done reading." << std::endl;
   // sequential_k_cycles(xadj, adj, no_vertices, k);
-  // BFS_driver(xadj, adj, no_vertices, k);
+  BFS_driver(xadj, adj, no_vertices, k);
   return nullptr;
 }
 

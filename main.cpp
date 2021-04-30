@@ -43,27 +43,31 @@ int find_in_path(int *array, int item, int length) {
 
 void parallel_BFS(int *xadj, int *adj, int *nov, int *prev_vertices, int k,
                   int curr_vertex, int curr_len, int &ct) {
-#ifdef DEBUG
-  std::cout << "running bfs on " << curr.k << " " << curr.curr_vertex
-            << std::endl;
-#endif
+  #ifdef DEBUG
+  #pragma omp critical
+  {
+    if (curr_len > 1 )
+      std::cout << "running bfs on " << k << " " << curr_vertex << " " << prev_vertices[curr_len-2]
+                << std::endl;
+  }
+  #endif
   if (k == 0) {
     if (contains(adj, xadj[curr_vertex], xadj[curr_vertex + 1],
                  prev_vertices[0])) {
       // if vertex's neighbors include start
-#pragma omp atomic
+      #pragma omp atomic
       ct++;
-// avoid race condition
-#ifdef DEBUG
+      // avoid race condition
+      #ifdef DEBUG
       std::cout << "added one loop!" << std::endl;
       for (int i = 0; i < 5; ++i)
         std::cout << prev_vertices[i] << ' ';
       std::cout << curr_vertex << std::endl;
-#endif
+      #endif
     }
   }
-#pragma omp parallel
-#pragma omp single
+  #pragma omp parallel
+  #pragma omp single
   {
     /*no need for path to be private, all neighbors share the same path*/
     int *path = new int[curr_len + 1];
@@ -77,7 +81,7 @@ void parallel_BFS(int *xadj, int *adj, int *nov, int *prev_vertices, int k,
       if (find_in_path(prev_vertices, adj[j], curr_len) == -1 && k != 0)
       // prev vertices do not include the neighbor we're attempting to insert)
       {
-#pragma omp task
+        #pragma omp task
         { parallel_BFS(xadj, adj, nov, path, k - 1, adj[j], curr_len + 1, ct); }
       }
   }
@@ -99,17 +103,17 @@ void parallel_BFS_driver(int *xadj, int *adj, int *nov, int k) {
   */
   int count = 0;
   double start = omp_get_wtime();
-#pragma omp parallel
-#pragma omp single
+  #pragma omp parallel
+  #pragma omp single
   {
     int *prev = new int[1];
     prev[0] = -1;
     for (int i = 0; i < *nov; i++) {
-#pragma omp task
+      #pragma omp task
       { parallel_BFS(xadj, adj, nov, prev, k - 1, i, 1, count); }
     }
   }
-#pragma omp taskwait
+  #pragma omp taskwait
   double end = omp_get_wtime();
   std::cout << "Total cycles of length " << k << " are " << count / 2
             << " it took " << end - start << " seconds." << std::endl;
@@ -117,21 +121,21 @@ void parallel_BFS_driver(int *xadj, int *adj, int *nov, int k) {
 
 void BFS(int *xadj, int *adj, int *nov, work curr, int &ct,
          std::deque<work> &work_queue) {
-#ifdef DEBUG
+  #ifdef DEBUG
   std::cout << "running bfs on " << curr.k << " " << curr.curr_vertex
             << std::endl;
-#endif
+  #endif
   if (curr.k == 0) {
     if (contains(adj, xadj[curr.curr_vertex], xadj[curr.curr_vertex + 1],
                  curr.prev_vertices[0])) {
       // if vertex's neighbors include start
       ct++;
-#ifdef DEBUG
+      #ifdef DEBUG
       std::cout << "added one loop!" << std::endl;
       for (int i = 0; i < curr.prev_vertices.size(); ++i)
         std::cout << curr.prev_vertices[i] << ' ';
       std::cout << curr.curr_vertex << std::endl;
-#endif
+      #endif
     }
   }
   for (int j = xadj[curr.curr_vertex]; j < xadj[curr.curr_vertex + 1]; j++)
@@ -187,7 +191,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
     // vertex start
     if (contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
       // std::cout << "count incremented";
-      #pragma omp atomic
+      //#pragma omp atomic
       (count)++;
       return;
     } else
@@ -197,7 +201,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
   // For searching every possible path of
   // length (n-1)
   for (int j = xadj[vertex]; j < xadj[vertex + 1]; j++)
-    if (!marked[adj[j]])
+    if (!marked[adj[j]] && adj[j] > start)
       // DFS for searching path by decreasing length by 1
       DFS(xadj, adj, nov, marked, k - 1, adj[j], start, count);
 
@@ -240,34 +244,23 @@ int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
   double start, end;
   int ct = 0;
   start = omp_get_wtime();
-  #pragma omp parallel
+  #pragma omp parallel reduction(+:ct)
   {
-    int id, i, Nthrds, istart, iend;
-    id = omp_get_thread_num();
-    Nthrds = omp_get_num_threads();
-    istart = id * *nov / Nthrds;
-    iend = (id+1) * *nov / Nthrds;
-    if (id == Nthrds-1)iend = *nov;
+    #pragma omp single
+    std::cout << "Number of threads: " << omp_get_num_threads() << "\n";
     
     bool *marked = new bool[*nov];
-
-    for(int j = 0; j < *nov; j++)  {
-      if(j < istart)
-        marked[j] = true;
-      else
-        marked[j] = false;
-    }
+    memset(marked, false, sizeof(marked));
+    
     // Searching for cycle by using v-n+1 vertices
     #pragma omp single
     std::cout << "Marked arrays set\n";
     // int *count = &ct;
-    for (i = istart; i < iend; i++) {
+    #pragma omp for schedule(dynamic)
+    for (int i = 0; i < *nov - (k - 1); i++)
+    //for (i = istart; i < iend; i++) 
+    {
       DFS(xadj, adj, nov, marked, k - 1, i, i, ct);
-      // DFS(graph,marked,3,0,0,0)->DFS(graph,marked,3,1,1,value of
-      // ct)->DFS(graph,marked,3,2,2,value of ct)
-
-      // ith vertex is marked as visited and
-      // will not be visited again.
       marked[i] = true;
     }
     /*the contributes line mentions this*/
@@ -378,7 +371,7 @@ void *read_edges(char *bin_name, int k) {
 
 int main(int argc, char *argv[]) {
   /*first arg is filename, second is k*/
-  omp_set_num_threads(8);
+  //omp_set_num_threads(8);
   read_edges(argv[1], atoi(argv[2]));
   return 0;
 }

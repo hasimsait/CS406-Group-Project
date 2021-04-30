@@ -187,6 +187,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
     // vertex start
     if (contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
       // std::cout << "count incremented";
+      #pragma omp atomic
       (count)++;
       return;
     } else
@@ -228,6 +229,50 @@ int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
   }
   /*the contributes line mentions this*/
   double end = omp_get_wtime();
+  std::cout << "Total cycles of length " << k << " are " << ct / 2 * k
+            << " it took " << end - start << " seconds." << std::endl;
+  return (ct / 2) * k;
+}
+
+int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
+  std::cout << "Parallel DFS is starting" << std::endl;
+  // all vertex are marked un-visited initially.
+  double start, end;
+  int ct = 0;
+  start = omp_get_wtime();
+  #pragma omp parallel
+  {
+    int id, i, Nthrds, istart, iend;
+    id = omp_get_thread_num();
+    Nthrds = omp_get_num_threads();
+    istart = id * *nov / Nthrds;
+    iend = (id+1) * *nov / Nthrds;
+    if (id == Nthrds-1)iend = *nov;
+    
+    bool *marked = new bool[*nov];
+
+    for(int j = 0; j < *nov; j++)  {
+      if(j < istart)
+        marked[j] = true;
+      else
+        marked[j] = false;
+    }
+    // Searching for cycle by using v-n+1 vertices
+    #pragma omp single
+    std::cout << "Marked arrays set\n";
+    // int *count = &ct;
+    for (i = istart; i < iend; i++) {
+      DFS(xadj, adj, nov, marked, k - 1, i, i, ct);
+      // DFS(graph,marked,3,0,0,0)->DFS(graph,marked,3,1,1,value of
+      // ct)->DFS(graph,marked,3,2,2,value of ct)
+
+      // ith vertex is marked as visited and
+      // will not be visited again.
+      marked[i] = true;
+    }
+    /*the contributes line mentions this*/
+  }
+  end = omp_get_wtime();
   std::cout << "Total cycles of length " << k << " are " << ct / 2 * k
             << " it took " << end - start << " seconds." << std::endl;
   return (ct / 2) * k;
@@ -325,8 +370,9 @@ void *read_edges(char *bin_name, int k) {
   }
   std::cout << "Done reading." << std::endl;
   sequential_k_cycles(xadj, adj, no_vertices, k);
-  BFS_driver(xadj, adj, no_vertices, k);
-  parallel_BFS_driver(xadj, adj, no_vertices, k);
+  parallel_k_cycles(xadj, adj, no_vertices, k);
+  //BFS_driver(xadj, adj, no_vertices, k);
+  //parallel_BFS_driver(xadj, adj, no_vertices, k);
   return 0;
 }
 

@@ -61,13 +61,13 @@ int countCycles(bool graph[][V], int n) {
   return (count / 2) * n;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
   bool graph[][V] = {{0, 1, 0, 1, 0},
                      {1, 0, 1, 0, 1},
                      {0, 1, 0, 1, 0},
                      {1, 0, 1, 0, 1},
                      {0, 1, 0, 1, 0}};
   int n = 4;
-  cout << "Total cycles of length " << n << " are " << countCycles(graph, n);
+  cout << "Total cycles of length " << n << " are " << countCycles(graph, atoi(argv[1]));
   return 0;
 }

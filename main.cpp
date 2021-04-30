@@ -32,27 +32,25 @@ bool contains(int *array, int start, int end, int item) {
 
 void BFS(int *xadj, int *adj, int *nov, work curr, int &ct,
          std::deque<work> &work_queue) {
-#ifdef DEBUG
+  #ifdef DEBUG
   std::cout << "running bfs on " << curr.k << " " << curr.curr_vertex
             << std::endl;
-#endif
+  #endif
   if (curr.k == 0) {
     if (contains(adj, xadj[curr.curr_vertex], xadj[curr.curr_vertex + 1],
                  curr.prev_vertices[0])) {
       // if vertex's neighbors include start
       ct++;
-#ifdef DEBUG
+      #ifdef DEBUG
       std::cout << "added one loop!" << std::endl;
       for (int i = 0; i < curr.prev_vertices.size(); ++i)
         std::cout << curr.prev_vertices[i] << ' ';
       std::cout << curr.curr_vertex << std::endl;
-#endif
+      #endif
     }
   }
   for (int j = xadj[curr.curr_vertex]; j < xadj[curr.curr_vertex + 1]; j++)
-    if (std::find(curr.prev_vertices.begin(), curr.prev_vertices.end(),
-                  adj[j]) == curr.prev_vertices.end() &&
-        curr.k != 0)
+    if (std::find(curr.prev_vertices.begin(), curr.prev_vertices.end(), adj[j]) == curr.prev_vertices.end() && curr.k != 0)
     // prev vertices do not include the neighbor we're attempting to insert)
     {
       struct work new_work;
@@ -109,6 +107,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
 
   // if the path of length (n-1) is found
   if (k == 0) {
+    
 
     // mark vert as un-visited to make
     // it usable again.
@@ -117,6 +116,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
     // Check if vertex vert can end with
     // vertex start
     if (contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
+      //std::cout << "count incremented";
       (count)++;
       return;
     } else
@@ -128,7 +128,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
   for (int j = xadj[vertex]; j < xadj[vertex + 1]; j++)
     if (!marked[adj[j]])
       // DFS for searching path by decreasing length by 1
-      DFS(xadj, adj, nov, marked, k - 1, vertex, start, count);
+      DFS(xadj, adj, nov, marked, k - 1, adj[j], start, count);
 
   // marking vert as unvisited to make it
   // usable again.
@@ -191,12 +191,12 @@ int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
 }
 
 /*Read the given file and return CSR*/
-void *read_edges(std::string bin_name, int k) {
+void *read_edges(char* bin_name, int k) {
   std::cout << "fname: " << bin_name << std::endl;
 
   // count the newlines
   unsigned int number_of_lines = 0;
-  FILE *infile = fopen(bin_name.c_str(), "r");
+  FILE *infile = fopen(bin_name, "r");
   int ch;
   while (EOF != (ch = getc(infile)))
     if ('\n' == ch)
@@ -281,9 +281,9 @@ void *read_edges(std::string bin_name, int k) {
     xadj[i + 1] = sum;
   }
   std::cout << "Done reading." << std::endl;
-  // sequential_k_cycles(xadj, adj, no_vertices, k);
-  BFS_driver(xadj, adj, no_vertices, k);
-  return nullptr;
+  sequential_k_cycles(xadj, adj, no_vertices, k);
+  //BFS_driver(xadj, adj, no_vertices, k);
+  return 0;
 }
 
 int main(int argc, char *argv[]) {

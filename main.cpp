@@ -21,15 +21,6 @@ struct work {
   int curr_vertex;
 };
 
-struct minimal_work {
-  // previous vertices in this path. k max is 5 anyways.
-  int *prev_vertices;
-  // number of vertices that will be added to this path
-  int k;
-  // the vertex that we're adding to this path in this branch
-  int curr_vertex;
-};
-
 /*returns true if array contains item within [start,end)*/
 bool contains(int *array, int start, int end, int item) {
   /*TODO array[start] to array[end] is sorted, switch to binary search*/
@@ -40,7 +31,7 @@ bool contains(int *array, int start, int end, int item) {
   return false;
 }
 
-int find_in_path(int *array, int item,int length) {
+int find_in_path(int *array, int item, int length) {
   int i = 0;
   while (array[i] != -1 && i < length) {
     if (i == item)
@@ -62,6 +53,7 @@ void parallel_BFS(int *xadj, int *adj, int *nov, int *prev_vertices, int k,
       // if vertex's neighbors include start
 #pragma omp atomic
       ct++;
+// avoid race condition
 #ifdef DEBUG
       std::cout << "added one loop!" << std::endl;
       for (int i = 0; i < 5; ++i)
@@ -73,36 +65,48 @@ void parallel_BFS(int *xadj, int *adj, int *nov, int *prev_vertices, int k,
 #pragma omp parallel
 #pragma omp single
   {
+    /*no need for path to be private, all neighbors share the same path*/
+    int *path = new int[curr_len + 1];
+    memcpy(path, prev_vertices, sizeof(*prev_vertices));
+    // last element will be undefined, rest will be copied from
+    // prev_vertices.
+    path[curr_len - 1] = curr_vertex;
+    path[curr_len] = -1;
+    // TODO we're passing count along, no need for this poor man's \0
     for (int j = xadj[curr_vertex]; j < xadj[curr_vertex + 1]; j++)
-      if (find_in_path(prev_vertices, adj[j],curr_len) == -1 && k != 0)
+      if (find_in_path(prev_vertices, adj[j], curr_len) == -1 && k != 0)
       // prev vertices do not include the neighbor we're attempting to insert)
       {
 #pragma omp task
-        {
-          int *prev = new int[curr_len+1];
-          memcpy(prev, prev_vertices, sizeof(*prev_vertices));
-          prev[curr_len-1] = curr_vertex;
-          prev[curr_len] = -1;
-          parallel_BFS(xadj, adj, nov, prev, k - 1, adj[j],curr_len+1, ct);
-        }
+        { parallel_BFS(xadj, adj, nov, path, k - 1, adj[j], curr_len + 1, ct); }
       }
   }
 }
 
 void parallel_BFS_driver(int *xadj, int *adj, int *nov, int k) {
   std::cout << "Parallel BFS with OMP is starting" << std::endl;
+  /*ADJ AND XADJ ARE CORRECT, UNCOMMENT TO VERIFY.*/
+  /*
+  for (int i = 0; i < *nov + 1; i++) {
+    std::cout << xadj[i] << " ";
+  }
+  std::cout << std::endl;
+  for (int i = 0; i < *nov; i++) {
+    for (int j = xadj[i]; j < xadj[i + 1]; j++) {
+      std::cout << adj[j] << " ";
+    }
+  }
+  */
   int count = 0;
   double start = omp_get_wtime();
 #pragma omp parallel
 #pragma omp single
   {
+    int *prev = new int[1];
+    prev[0] = -1;
     for (int i = 0; i < *nov; i++) {
 #pragma omp task
-      {
-        int *prev = new int[1];
-        prev[0] = -1;
-        parallel_BFS(xadj, adj, nov, prev, k - 1, i,1, count);
-      }
+      { parallel_BFS(xadj, adj, nov, prev, k - 1, i, 1, count); }
     }
   }
 #pragma omp taskwait
@@ -201,22 +205,6 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
   marked[vertex] = false;
 }
 
-int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
-  /*ADJ AND XADJ ARE CORRECT, UNCOMMENT TO VERIFY.*/
-  /*
-  for (int i = 0; i < *nov + 1; i++) {
-    std::cout << xadj[i] << " ";
-  }
-  std::cout << std::endl;
-  for (int i = 0; i < *nov; i++) {
-    for (int j = xadj[i]; j < xadj[i + 1]; j++) {
-      std::cout << adj[j] << " ";
-    }
-  }
-  */
-  // TODO OPEN_MP IMPLEMENTATION OF THE DFS THAT WAS PROPOSED
-  return 0;
-}
 int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
   std::cout << "Sequential DFS is starting" << std::endl;
   // all vertex are marked un-visited initially.
@@ -344,7 +332,7 @@ void *read_edges(char *bin_name, int k) {
 
 int main(int argc, char *argv[]) {
   /*first arg is filename, second is k*/
-  omp_set_num_threads(2);
+  omp_set_num_threads(8);
   read_edges(argv[1], atoi(argv[2]));
   return 0;
 }

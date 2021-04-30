@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstring>
 #include <deque>
 #include <fstream>
 #include <iostream>
@@ -39,9 +40,9 @@ bool contains(int *array, int start, int end, int item) {
   return false;
 }
 
-int find_in_path(int *array, int item) {
+int find_in_path(int *array, int item,int length) {
   int i = 0;
-  while (array[i] != -1 && i < 5) {
+  while (array[i] != -1 && i < length) {
     if (i == item)
       return i;
     i++;
@@ -49,68 +50,59 @@ int find_in_path(int *array, int item) {
   return -1;
 }
 
-void parallel_BFS(int *xadj, int *adj, int *nov, minimal_work curr, int &ct,
-                  std::deque<minimal_work> &work_queue) {
+void parallel_BFS(int *xadj, int *adj, int *nov, int *prev_vertices, int k,
+                  int curr_vertex, int curr_len, int &ct) {
 #ifdef DEBUG
   std::cout << "running bfs on " << curr.k << " " << curr.curr_vertex
             << std::endl;
 #endif
-  if (curr.k == 0) {
-    if (contains(adj, xadj[curr.curr_vertex], xadj[curr.curr_vertex + 1],
-                 curr.prev_vertices[0])) {
+  if (k == 0) {
+    if (contains(adj, xadj[curr_vertex], xadj[curr_vertex + 1],
+                 prev_vertices[0])) {
       // if vertex's neighbors include start
 #pragma omp atomic
       ct++;
 #ifdef DEBUG
       std::cout << "added one loop!" << std::endl;
       for (int i = 0; i < 5; ++i)
-        std::cout << curr.prev_vertices[i] << ' ';
-      std::cout << curr.curr_vertex << std::endl;
+        std::cout << prev_vertices[i] << ' ';
+      std::cout << curr_vertex << std::endl;
 #endif
     }
-  }
-  for (int j = xadj[curr.curr_vertex]; j < xadj[curr.curr_vertex + 1]; j++)
-    if (find_in_path(curr.prev_vertices, adj[j]) == -1 && curr.k != 0)
-    // prev vertices do not include the neighbor we're attempting to insert)
-    {
-      struct minimal_work new_work;
-      int *prev = new int[6];
-      *prev = *curr.prev_vertices;
-      int last = find_in_path(prev, -1);
-      prev[last] = curr.curr_vertex;
-      prev[last + 1] = -1;
-      new_work.prev_vertices = prev;
-      std::cout << "Copied prev vertices" << std::endl;
-      new_work.k = curr.k - 1;
-      new_work.curr_vertex = adj[j];
-#pragma omp critical
-      work_queue.push_back(new_work);
-      std::cout << "Pushed back to queue" << std::endl;
-    }
-}
-
-void parallel_BFS_driver(int *xadj, int *adj, int *nov, int k) {
-  std::cout << "Parallel BFS with OMP is starting" << std::endl;
-  std::deque<minimal_work> work_queue;
-  int count = 0;
-  double start = omp_get_wtime();
-  for (int i = 0; i < *nov; i++) {
-    struct minimal_work new_work;
-    int *prev = new int[6];
-    prev[0] = -1;
-    new_work.prev_vertices = prev;
-    new_work.k = k - 1;
-    new_work.curr_vertex = i;
-    work_queue.push_back(new_work);
   }
 #pragma omp parallel
 #pragma omp single
   {
-    while (!work_queue.empty()) {
-      struct minimal_work curr = work_queue[0];
-      work_queue.pop_front();
+    for (int j = xadj[curr_vertex]; j < xadj[curr_vertex + 1]; j++)
+      if (find_in_path(prev_vertices, adj[j],curr_len) == -1 && k != 0)
+      // prev vertices do not include the neighbor we're attempting to insert)
+      {
 #pragma omp task
-      parallel_BFS(xadj, adj, nov, curr, count, work_queue);
+        {
+          int *prev = new int[curr_len+1];
+          memcpy(prev, prev_vertices, sizeof(*prev_vertices));
+          prev[curr_len-1] = curr_vertex;
+          prev[curr_len] = -1;
+          parallel_BFS(xadj, adj, nov, prev, k - 1, adj[j],curr_len+1, ct);
+        }
+      }
+  }
+}
+
+void parallel_BFS_driver(int *xadj, int *adj, int *nov, int k) {
+  std::cout << "Parallel BFS with OMP is starting" << std::endl;
+  int count = 0;
+  double start = omp_get_wtime();
+#pragma omp parallel
+#pragma omp single
+  {
+    for (int i = 0; i < *nov; i++) {
+#pragma omp task
+      {
+        int *prev = new int[1];
+        prev[0] = -1;
+        parallel_BFS(xadj, adj, nov, prev, k - 1, i,1, count);
+      }
     }
   }
 #pragma omp taskwait
@@ -346,12 +338,13 @@ void *read_edges(char *bin_name, int k) {
   std::cout << "Done reading." << std::endl;
   sequential_k_cycles(xadj, adj, no_vertices, k);
   BFS_driver(xadj, adj, no_vertices, k);
-  //parallel_BFS_driver(xadj, adj, no_vertices, k);
+  parallel_BFS_driver(xadj, adj, no_vertices, k);
   return 0;
 }
 
 int main(int argc, char *argv[]) {
   /*first arg is filename, second is k*/
+  omp_set_num_threads(2);
   read_edges(argv[1], atoi(argv[2]));
   return 0;
 }

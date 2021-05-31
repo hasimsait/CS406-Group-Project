@@ -12,6 +12,9 @@
 #include <string>
 #include <vector>
 
+
+void wrapper(int* xadj,int* adj,int* no_vertices,int k);
+
 struct work {
   // previous vertices in this path. k max is 5 anyways.
   std::vector<int> prev_vertices;
@@ -362,8 +365,11 @@ void *read_edges(char *bin_name, int k) {
     xadj[i + 1] = sum;
   }
   std::cout << "Done reading." << std::endl;
-  sequential_k_cycles(xadj, adj, no_vertices, k);
-  parallel_k_cycles(xadj, adj, no_vertices, k);
+  
+  wrapper(xadj, adj, no_vertices, k);
+  
+  //sequential_k_cycles(xadj, adj, no_vertices, k);
+  //parallel_k_cycles(xadj, adj, no_vertices, k);
   //BFS_driver(xadj, adj, no_vertices, k);
   //parallel_BFS_driver(xadj, adj, no_vertices, k);
   return 0;
@@ -371,7 +377,7 @@ void *read_edges(char *bin_name, int k) {
 
 int main(int argc, char *argv[]) {
   /*first arg is filename, second is k*/
-  //omp_set_num_threads(8);
+  omp_set_num_threads(8);
   read_edges(argv[1], atoi(argv[2]));
   return 0;
 }

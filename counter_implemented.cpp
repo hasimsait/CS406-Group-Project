@@ -31,6 +31,24 @@ bool contains(int *array, int start, int end, int item) {
   }
   return false;
 }
+bool contains_binary(int *array, int start, int end, int item){
+    while (start <= end) {
+            int m = start + (end - start) / 2;
+    
+            // Check if x is present at mid
+            if (array[m] == item)
+                return true;
+    
+            // If x greater, ignore left half
+            if (array[m] < item)
+                start = m + 1;
+    
+            // If x is smaller, ignore right half
+            else
+                end = m - 1;
+        }
+    return false;
+}
 
 int find_in_path(int *array, int item, int length) {
   int i = 0;

@@ -24,11 +24,43 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 //This is a very good idea to wrap your calls with that function.. Otherwise you will not be able to see what is the error.
 //Moreover, you may also want to look at how to use cuda-memcheck and cuda-gdb for debugging.
 
-__global__ void parallel_cycles(int* d_xadj,int* d_adj, int* d_nv, int* d_result){
+__device__ int counter;
+
+__device__ bool contains_binary(){
+
+
+}
+
+
+__device__ void DFS(int *d_xadj, int *d_adj, int* d_nv, int k, int vertex, int start, int *d_result){
+
+     if(k == 0){
+
+         if(contains_binary(d_adj, d_xadj[vertex], d_xadj[vertex+1], start)){
+              atomicAdd(counter,1);
+              
+         }
+        
+     }
+     else{
+      
+          
+     }
+   
+
+}
+
+
+__global__ void parallel_cycles(int* d_xadj,int* d_adj, int* d_nv, int* d_result, int *d_k){
   
   //TO DO: GPU SCALE
-  printf("Number of vertices: %d \n", *d_nv );
-  
+  int index = threadIdx.x + blockIdx.x * blockDim.x;
+
+
+  if(index < *d_nv){
+      DFS(d_xadj, d_adj, d_nv, *d_k-1, index, index, d_result );
+      printf("d_result = %d", *d_result);  
+  }  
   
 }
 
@@ -44,6 +76,7 @@ void wrapper(int* xadj, int* adj,int* no_vertices, int k){
   int* d_result;
   int* h_result;
   int* d_nv;
+  int* d_k;
  
   h_result = (int*)malloc(sizeof(int));
   *h_result = 0;
@@ -60,19 +93,21 @@ void wrapper(int* xadj, int* adj,int* no_vertices, int k){
   cudaMalloc( (void **) &d_adj, *adj *sizeof(int));
   cudaMalloc( (void **) &d_result, sizeof(int));
   cudaMalloc( (void **) &d_nv, sizeof(int));
+  cudaMalloc( (void **) &d_k, sizeof(int));
 
 
   cudaMemcpy(d_xadj, xadj, (*no_vertices) * sizeof(int), cudaMemcpyHostToDevice );
   cudaMemcpy(d_adj, adj, (*no_vertices) * sizeof(int), cudaMemcpyHostToDevice );
   cudaMemcpy(d_result, h_result, sizeof(int), cudaMemcpyHostToDevice );
   cudaMemcpy(d_nv, no_vertices, sizeof(int), cudaMemcpyHostToDevice );
+  cudaMemcpy(d_k, &k, sizeof(int), cudaMemcpyHostToDevice );
 
   int no_blocks = (ceil)((*no_vertices)/no_thread);
   
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
   
-  parallel_cycles<<<1,no_thread>>>(d_xadj, d_adj, d_nv, d_result);
+  parallel_cycles<<<1,no_thread>>>(d_xadj, d_adj, d_nv, d_result, d_k);
   cudaDeviceSynchronize(); 
   gpuErrchk( cudaDeviceSynchronize() );
   

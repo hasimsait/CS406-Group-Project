@@ -20,7 +20,24 @@ struct work {
   // the vertex that we're adding to this path in this branch
   int curr_vertex;
 };
+bool contains_binary(int *array, int start, int end, int item){
+    while (start <= end) {
+            int m = start + (end - start) / 2;
 
+            // Check if x is present at mid
+            if (array[m] == item)
+                return true;
+
+            // If x greater, ignore left half
+            if (array[m] < item)
+                start = m + 1;
+
+            // If x is smaller, ignore right half
+            else
+                end = m - 1;
+        }
+    return false;
+}
 /*returns true if array contains item within [start,end)*/
 bool contains(int *array, int start, int end, int item) {
   /*TODO array[start] to array[end] is sorted, switch to binary search*/
@@ -195,11 +212,10 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
       
   
 
-      //for(int i=0; i<path.size();i++){
+      for(int i=0; i<path.size();i++){
       #pragma omp atomic
-      counter[path[0]]++;
-       
-	  //}
+      counter[path[i]]++;   
+	  }
         
       return;
     } else{
@@ -220,7 +236,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
 }
 
 int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
-  std::cout << "Sequential DFS is starting" << std::endl;
+  //std::cout << "Sequential DFS is starting" << std::endl;
   // all vertex are marked un-visited initially.
   bool *marked = new bool[*nov];
   
@@ -244,30 +260,30 @@ int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
   }
   /*the contributes line mentions this*/
   double end = omp_get_wtime();
-  std::cout << "Total cycles of length " << k << " are " << ct / 2 * k
-            << " it took " << end - start << " seconds." << std::endl;
+  //std::cout << "Total cycles of length " << k << " are " << ct / 2 * k
+    //        << " it took " << end - start << " seconds." << std::endl;
   return (ct / 2) * k;
 }
 
 int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
-  std::cout << "Parallel DFS is starting" << std::endl;
+  //std::cout << "Parallel DFS is starting" << std::endl;
   // all vertex are marked un-visited initially.
   double start, end;
   int ct = 0;
   int * count_ = new int[*nov];
   memset(count_, 0, sizeof(count_));
   start = omp_get_wtime();
-  #pragma omp parallel reduction(+:ct)
-  {
-    #pragma omp single
-    std::cout << "Number of threads: " << omp_get_num_threads() << "\n";
+  //#pragma omp parallel reduction(+:ct)
+  //{
+    //#pragma omp single
+    //std::cout << "Number of threads: " << omp_get_num_threads() << "\n";
     
     bool *marked = new bool[*nov];
     memset(marked, false, sizeof(marked));
     std::vector <int> path;
     // Searching for cycle by using v-n+1 vertices
-    #pragma omp single
-    std::cout << "Marked arrays set\n";
+    //#pragma omp single
+    //std::cout << "Marked arrays set\n";
     // int *count = &ct;
     #pragma omp for schedule(dynamic)
     for (int i = 0; i < *nov - (k - 1); i++)
@@ -279,24 +295,24 @@ int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
       //ct=0;
     }
     /*the contributes line mentions this*/
-  }
+  //}
   int sum = 0;
   end = omp_get_wtime();
   std::cout << "Total cycles of length " << k << " are " << ct / 2 * k
             << " it took " << end - start << " seconds." << std::endl;
             
         for(int i = 0;i<*nov;i++){
-	  std::cout << "Node: "<< i << " Cycle Count: "<<(count_[i]*k)/2 << std::endl;
+	  std::cout <<  i << " "<<(count_[i]) << std::endl;
 	  sum+=(count_[i]*k)/2;
         }
-      std::cout << sum << std::endl;
+      //std::cout << sum << std::endl;
       
   return (ct / 2) * k;
 }
 
 /*Read the given file and return CSR*/
 void *read_edges(char *bin_name, int k) {
-  std::cout << "fname: " << bin_name << std::endl;
+  //std::cout << "fname: " << bin_name << std::endl;
 
   // count the newlines
   unsigned int number_of_lines = 0;
@@ -384,7 +400,7 @@ void *read_edges(char *bin_name, int k) {
     sum += A[i].size();
     xadj[i + 1] = sum;
   }
-  std::cout << "Done reading." << std::endl;
+  //std::cout << "Done reading." << std::endl;
   int * counter = new int[1];
   std::vector<int> path;
   sequential_k_cycles(xadj, adj, no_vertices, k);
@@ -396,7 +412,7 @@ void *read_edges(char *bin_name, int k) {
 
 int main(int argc, char *argv[]) {
   /*first arg is filename, second is k*/
-  omp_set_num_threads(8);
+  omp_set_num_threads(1);
   read_edges(argv[1], atoi(argv[2]));
   return 0;
 }

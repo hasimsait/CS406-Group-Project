@@ -32,8 +32,16 @@ Onur Arda Bodur
 | dblp        | 4 |  12.0967   |  8.18795   |  6.58545   |  5.35292   |  4.64312    |  191.320938 |        
 | dblp        | 5 |  629.311   |  514.97    |  584.028   |  546.786   |  482.425    |  >600       |
 
+## Results on provided graphs after passing one path per thread only in Cuda
+| instance    | k | sequential | OpenMP t=2 | OpenMP t=4 | OpenMP t=8 | OpenMP t=16 | Cuda        |
+| ----------- | - | ---------- | ---------- | ---------- | ---------- | ----------- | ----------- |
+| amazon      | 3 |  0.279555  |  0.194179  |  0.133981  |  0.0905637 |  0.0699001  |  0.279176   |
+| amazon      | 4 |  1.64887   |  0.915767  |  0.513519  |  0.301799  |  0.173176   |  3.601732   |
+| amazon      | 5 |  10.5503   |  5.97017   |  3.02007   |  1.58916   |  0.838295   |  54.977879  |
+| dblp        | 3 |  0.495958  |  0.356659  |  0.257321  |  0.165979  |  0.109911   |  1.975520   |
+| dblp        | 4 |  12.0967   |  8.18795   |  6.58545   |  5.35292   |  4.64312    |  188.793884 |        
+| dblp        | 5 |  629.311   |  514.97    |  584.028   |  546.786   |  482.425    |  >600       |
 
-NOTE: The timings are made after the fixes we mentioned that we just did before demo. This is still not fully optimized, especially CUDA. It will be worked on starting tonight.
 *stride=1, once you take the transpose of the adj and a, it will speed up significantly. This DFS approach is limited on gpus as it causes significant divergence. When you have a certain amount of iterations of the for loop that performs the recursive call instead of xadj[i+1]-xadj[i], the performance will improve. The representation that provides stride also reduces the divergence significantly.
 
 The marked array is too large to create N copies of, initializing the pointers to those arrays crashes due to invalid memory access. This causes our parallel implementation to execute more instructions for all k and n than the sequential implementation.

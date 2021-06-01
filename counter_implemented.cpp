@@ -262,6 +262,8 @@ int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
   /*the contributes line mentions this*/
   double end = omp_get_wtime();
   std::cout << "Total cycles of length " << k << " took " << end - start << " seconds." << std::endl;
+
+  // decomment for output
   //for(int i = 0;i<*nov;i++){
 	  //std::cout <<  i << " "<<(count_[i]) << std::endl;
   //}
@@ -304,10 +306,10 @@ int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
   int sum = 0;
   end = omp_get_wtime();
   std::cout << "Total cycles of length " << k << " took " << end - start << " seconds." << std::endl;
-            
+
+  // decomment for output 
   //for(int i = 0;i<*nov;i++){
 	  //std::cout <<  i << " "<<(count_[i]) << std::endl;
-	  //sum+=(count_[i]*k)/2;
   //}
       
   return (ct / 2) * k;

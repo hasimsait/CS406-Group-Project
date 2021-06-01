@@ -24,10 +24,10 @@ inline void gpuAssert(cudaError_t code, const char *file, int line,
 __device__ bool device_contains(int *array, int start, int end, int item) {
   for (int j = start; j < end; j++) {
     if (array[j] == item)
-        return true;   
+        return true;
   }
   return false;
-} 
+}
 __device__ void deviceDFS(int *xadj, int *adj, int *nov, int k,
                           int max_k, int vertex, int *counter,int start, int* old_path) {
     //printf("DFS on %d at k %d\n",vertex,k);
@@ -44,10 +44,10 @@ __device__ void deviceDFS(int *xadj, int *adj, int *nov, int k,
         //for (int i = 0; i < max_k; i++) {
         //  atomicAdd(&counter[my_path[i]], 1);
         //}
-        atomicAdd(&counter[start], 1);
+	atomicAdd(&counter[start], 1);
         return;
       } else {
-        return;
+	return;
       }
     }
     //printf("my marked is at%p\n",(void *) marked);
@@ -91,23 +91,32 @@ void wrapper(int *xadj, int *adj, int *nov, int nnz, int k) {
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop, 0);
   unsigned int threads = prop.maxThreadsPerBlock;
-  //unsigned int threadDIM = prop.maxThreadsDim[3];
   std::cout << "Device Properties" << std::endl;
   std::cout << "The threads: " << threads << std::endl;
-  //std::cout << "Thread DIM:  " << threadDIM << std::endl;
   gpuErrchk(cudaDeviceSynchronize());
 #ifdef DEBUG
   std::cout << "malloc copy done" << std::endl;
 #endif
   setct<<<(*nov+threads-1)/threads, threads>>>(d_nov,d_ct);
-  //setct<<<1, threads>>>(d_nov,d_ct);
   gpuErrchk(cudaDeviceSynchronize());
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventRecord(start, 0);
   prep<<<(*nov+threads-1)/threads, threads>>>(d_xadj, d_adj, d_nov, k,k, d_ct);
-  //prep<<<1, threads>>>(d_xadj, d_adj, d_nov, k,k, d_ct);
   gpuErrchk(cudaDeviceSynchronize());
+  cudaEventCreate(&stop);
+  cudaEventRecord(stop, 0);
+  cudaEventSynchronize(stop);
   cudaMemcpy(ct, d_ct, (*nov) * sizeof(int), cudaMemcpyDeviceToHost);
   for (int i=0; i< *nov; i++)
     printf("%d %d\n", i, ct[i]);
+  float elapsedTime;
+  cudaEventElapsedTime(&elapsedTime, start, stop);
+  printf("GPU scale took: %f s\n", elapsedTime / 1000);
+  cudaFree(d_xadj);
+  cudaFree(d_adj);
+  cudaFree(d_nov);
+  cudaFree(d_ct);
 }
 
 /*Read the given file and return CSR*/
@@ -199,7 +208,6 @@ void *read_edges(char *bin_name, int k) {
     xadj[i + 1] = sum;
   }
   std::cout << "Done reading." << std::endl;
-  std::cout << "Done reading." << std::endl;
   wrapper(xadj, adj, no_vertices,no_edges, k);
   return 0;
 }
@@ -210,4 +218,3 @@ int main(int argc, char *argv[]) {
   read_edges(argv[1], atoi(argv[2]));
   return 0;
 }
-

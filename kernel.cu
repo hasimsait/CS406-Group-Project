@@ -24,49 +24,43 @@ inline void gpuAssert(cudaError_t code, const char *file, int line,
 __device__ bool device_contains(int *array, int start, int end, int item) {
   for (int j = start; j < end; j++) {
     if (array[j] == item)
-        return true;
+      return true;
   }
   return false;
 }
-__device__ void deviceDFS(int *xadj, int *adj, int *nov, int k,
-                          int max_k, int vertex, int *counter,int start, int* old_path) {
-    //printf("DFS on %d at k %d\n",vertex,k);
-    int my_path[7];
-    //memcpy(my_path,old_path,max_k*sizeof(int));
-    for(int i=0;i<max_k-k-1;i++){
-      my_path[i]=old_path[i];
+__device__ void deviceDFS(int *xadj, int *adj, int *nov, int k, int max_k,
+                          int vertex, int *counter, int start, int *my_path) {
+  // printf("DFS on %d at k %d\n",vertex,k);
+  my_path[max_k - k - 1] = vertex;
+  // for(int i=0; i<max_k-k;i++)
+  // printf("path element %d is %d\n",i,my_path[i]);
+  if (k == 0) {
+    if (device_contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
+      // for (int i = 0; i < max_k; i++) {
+      //  atomicAdd(&counter[my_path[i]], 1);
+      //}
+      atomicAdd(&counter[start], 1);
+      return;
+    } else {
+      return;
     }
-    my_path[max_k - k - 1] = vertex;
-    //for(int i=0; i<max_k-k;i++)
-      //printf("path element %d is %d\n",i,my_path[i]);
-    if (k == 0){
-      if (device_contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
-        //for (int i = 0; i < max_k; i++) {
-        //  atomicAdd(&counter[my_path[i]], 1);
-        //}
-	atomicAdd(&counter[start], 1);
-        return;
-      } else {
-	return;
-      }
+  }
+  // printf("my marked is at%p\n",(void *) marked);
+  for (int j = xadj[vertex]; j < xadj[vertex + 1]; j++) {
+    if (!device_contains(my_path, 0, max_k - k, adj[j])) {
+      deviceDFS(xadj, adj, nov, k - 1, max_k, adj[j], counter, start, my_path);
     }
-    //printf("my marked is at%p\n",(void *) marked);
-    for (int j = xadj[vertex]; j < xadj[vertex + 1]; j++){
-      if (!device_contains(my_path, 0, max_k-k,adj[j])){
-        deviceDFS(xadj, adj, nov, k - 1, max_k, adj[j], counter, start,
-                  my_path);
-      }
-    }
+  }
 }
 __global__ void prep(int *xadj, int *adj, int *nov, int k, int max_k, int *ct) {
   int id = blockIdx.x * blockDim.x + threadIdx.x;
   if (id < *nov) {
-    //int* my_path= new int[k];
-    int my_path[7];
-    deviceDFS(xadj, adj, nov, k - 1, max_k, id, ct,id, my_path);
+    // int* my_path= new int[k];
+    int my_path[6];
+    deviceDFS(xadj, adj, nov, k - 1, max_k, id, ct, id, my_path);
   }
 }
-__global__ void setct(int* nov,int * ct){
+__global__ void setct(int *nov, int *ct) {
   int id = blockIdx.x * blockDim.x + threadIdx.x;
   if (id < *nov) {
     ct[id] = 0;
@@ -78,9 +72,9 @@ void wrapper(int *xadj, int *adj, int *nov, int nnz, int k) {
   int *d_adj;
   int *d_nov;
   int *d_ct;
-  int *ct = new int [*nov];
+  int *ct = new int[*nov];
   cudaMalloc((void **)&d_xadj, (*nov + 1) * sizeof(int));
-  cudaMalloc((void **)&d_adj, nnz*sizeof(int));
+  cudaMalloc((void **)&d_adj, nnz * sizeof(int));
   cudaMalloc((void **)&d_nov, sizeof(int));
   cudaMalloc((void **)&d_ct, (*nov) * sizeof(int));
 
@@ -97,18 +91,19 @@ void wrapper(int *xadj, int *adj, int *nov, int nnz, int k) {
 #ifdef DEBUG
   std::cout << "malloc copy done" << std::endl;
 #endif
-  setct<<<(*nov+threads-1)/threads, threads>>>(d_nov,d_ct);
+  setct<<<(*nov + threads - 1) / threads, threads>>>(d_nov, d_ct);
   gpuErrchk(cudaDeviceSynchronize());
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
-  prep<<<(*nov+threads-1)/threads, threads>>>(d_xadj, d_adj, d_nov, k,k, d_ct);
+  prep<<<(*nov + threads - 1) / threads, threads>>>(d_xadj, d_adj, d_nov, k, k,
+                                                    d_ct);
   gpuErrchk(cudaDeviceSynchronize());
   cudaEventCreate(&stop);
   cudaEventRecord(stop, 0);
   cudaEventSynchronize(stop);
   cudaMemcpy(ct, d_ct, (*nov) * sizeof(int), cudaMemcpyDeviceToHost);
-  for (int i=0; i< *nov; i++)
+  for (int i = 0; i < *nov; i++)
     printf("%d %d\n", i, ct[i]);
   float elapsedTime;
   cudaEventElapsedTime(&elapsedTime, start, stop);
@@ -208,7 +203,7 @@ void *read_edges(char *bin_name, int k) {
     xadj[i + 1] = sum;
   }
   std::cout << "Done reading." << std::endl;
-  wrapper(xadj, adj, no_vertices,no_edges, k);
+  wrapper(xadj, adj, no_vertices, no_edges, k);
   return 0;
 }
 

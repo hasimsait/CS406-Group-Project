@@ -193,8 +193,8 @@ void BFS_driver(int *xadj, int *adj, int *nov, int k) {
 }
 
 void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
-         int start, int &count,int * counter,std::vector<int> path) {
-           path.push_back(vertex);
+         int start, int &count,int * counter,int *path, int level) {
+  path[level] = vertex;
   // mark the vertex vert as visited
   marked[vertex] = true;
 
@@ -209,16 +209,13 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
     // vertex start
     if (contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
       // std::cout << "count incremented";
-      
-  
-
-      for(int i=0; i<path.size();i++){
-      #pragma omp atomic
-      counter[path[i]]++;   
-	  }
-        
+      for(int i = 0; i < level + 1; i++){
+        #pragma omp atomic
+        counter[path[i]]++;   
+	    }
       return;
-    } else{
+    } 
+    else {
       return;
     }
   }
@@ -228,7 +225,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
   for (int j = xadj[vertex]; j < xadj[vertex + 1]; j++)
     if (!marked[adj[j]] && adj[j] > start){
       // DFS for searching path by decreasing length by 1
-      DFS(xadj, adj, nov, marked, k - 1, adj[j], start, count,counter,path);
+      DFS(xadj, adj, nov, marked, k - 1, adj[j], start, count, counter, path, level + 1);
     }
   // marking vert as unvisited to make it
   // usable again.
@@ -243,14 +240,18 @@ int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
   for (int i = 0; i < *nov; i++) {
     marked[i] = false;
   }
+
+  std::cout << "Sequential\n";
   // Searching for cycle by using v-n+1 vertices
   int ct = 0;
   // int *count = &ct;
-  int * counter = new int[*nov];
+  int * count_ = new int[*nov];
   std::vector<int> path;
+  int* path_exp = new int[k];
+  int level = 0;
   double start = omp_get_wtime();
-  for (int i = 0; i < *nov - (k - 1); i++) {
-    DFS(xadj, adj, nov, marked, k - 1, i, i, ct,counter,path);
+  for (int i = 0; i < *nov - (k - 1); ++i) {
+    DFS(xadj, adj, nov, marked, k - 1, i, i, ct, count_, path_exp, level);
     // DFS(graph,marked,3,0,0,0)->DFS(graph,marked,3,1,1,value of
     // ct)->DFS(graph,marked,3,2,2,value of ct)
 
@@ -260,8 +261,11 @@ int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
   }
   /*the contributes line mentions this*/
   double end = omp_get_wtime();
-  //std::cout << "Total cycles of length " << k << " are " << ct / 2 * k
-    //        << " it took " << end - start << " seconds." << std::endl;
+  std::cout << "Total cycles of length " << k << " took " << end - start << " seconds." << std::endl;
+  //for(int i = 0;i<*nov;i++){
+	  //std::cout <<  i << " "<<(count_[i]) << std::endl;
+  //}
+
   return (ct / 2) * k;
 }
 
@@ -273,39 +277,38 @@ int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
   int * count_ = new int[*nov];
   memset(count_, 0, sizeof(count_));
   start = omp_get_wtime();
-  //#pragma omp parallel reduction(+:ct)
-  //{
-    //#pragma omp single
-    //std::cout << "Number of threads: " << omp_get_num_threads() << "\n";
+  #pragma omp parallel
+  {
+    #pragma omp single
+    std::cout << "Number of threads: " << omp_get_num_threads() << "\n";
     
     bool *marked = new bool[*nov];
     memset(marked, false, sizeof(marked));
-    std::vector <int> path;
+    //std::vector <int> path;
+    int *path = new int[k];
+    int level = 0;
     // Searching for cycle by using v-n+1 vertices
     //#pragma omp single
     //std::cout << "Marked arrays set\n";
     // int *count = &ct;
     #pragma omp for schedule(dynamic)
     for (int i = 0; i < *nov - (k - 1); i++)
-    //for (i = istart; i < iend; i++) 
     {
-      DFS(xadj, adj, nov, marked, k - 1, i, i, ct,count_,path);
+      DFS(xadj, adj, nov, marked, k - 1, i, i, ct, count_, path, level);
       marked[i] = true;
       //count_[i] = ct;
       //ct=0;
     }
     /*the contributes line mentions this*/
-  //}
+  }
   int sum = 0;
   end = omp_get_wtime();
-  std::cout << "Total cycles of length " << k << " are " << ct / 2 * k
-            << " it took " << end - start << " seconds." << std::endl;
+  std::cout << "Total cycles of length " << k << " took " << end - start << " seconds." << std::endl;
             
-        for(int i = 0;i<*nov;i++){
-	  std::cout <<  i << " "<<(count_[i]) << std::endl;
-	  sum+=(count_[i]*k)/2;
-        }
-      //std::cout << sum << std::endl;
+  //for(int i = 0;i<*nov;i++){
+	  //std::cout <<  i << " "<<(count_[i]) << std::endl;
+	  //sum+=(count_[i]*k)/2;
+  //}
       
   return (ct / 2) * k;
 }
@@ -401,8 +404,6 @@ void *read_edges(char *bin_name, int k) {
     xadj[i + 1] = sum;
   }
   //std::cout << "Done reading." << std::endl;
-  int * counter = new int[1];
-  std::vector<int> path;
   sequential_k_cycles(xadj, adj, no_vertices, k);
   parallel_k_cycles(xadj, adj, no_vertices, k);
   //BFS_driver(xadj, adj, no_vertices, k);
@@ -412,7 +413,7 @@ void *read_edges(char *bin_name, int k) {
 
 int main(int argc, char *argv[]) {
   /*first arg is filename, second is k*/
-  omp_set_num_threads(1);
+  //omp_set_num_threads(8);
   read_edges(argv[1], atoi(argv[2]));
   return 0;
 }

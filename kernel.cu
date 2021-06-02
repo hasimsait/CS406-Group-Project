@@ -21,41 +21,99 @@ inline void gpuAssert(cudaError_t code, const char *file, int line,
 // you will not b Moreover, you may also want to look at how to use
 // cuda-memcheck and cuda-gdb for debuggin
 
-__device__ bool device_contains(int *array, int start, int end, int item) {
-  for (int j = start; j < end; j++) {
-    if (array[j] == item)
-      return true;
-  }
-  return false;
-}
-__device__ void deviceDFS(int *xadj, int *adj, int *nov, int k, int max_k,
-                          int vertex, int *counter, int start, int *my_path) {
-  my_path[(threadIdx.x*5)+max_k - k - 1] = vertex;
-  // for(int i=0; i<max_k-k;i++)
-  // printf("path element %d is %d\n",i,my_path[i]);
-  if (k == 0) {
-    if (device_contains(adj, xadj[vertex], xadj[vertex + 1], start))
-      //atomicAdd(&counter[start], 1);
-      counter[threadIdx.x]++;
-    return;
-  }
+__device__ void deviceDFSk5(int *xadj, int *adj, int *nov, int first,
+                            int *counter) {
   // printf("my marked is at%p\n",(void *) marked);
-  for (int j = xadj[vertex]; j < xadj[vertex + 1]; j++) {
-    if (!device_contains(my_path+(threadIdx.x*5), 0, max_k - k, adj[j])) {
-      deviceDFS(xadj, adj, nov, k - 1, max_k, adj[j], counter, start, my_path);
+  for (int i = xadj[first]; i < xadj[first + 1]; i++) {
+    // adj[i] are the neighbors of first vertex, none can be first by definition
+    // (no loops of len-1)
+    for (int j = xadj[adj[i]]; j < xadj[adj[i] + 1]; j++) {
+      // adj[j] are the neighbors of the second vertex on this path,
+      // they can't be first.
+      if (adj[j] != first) {
+        for (int k = xadj[adj[j]]; k < xadj[adj[j] + 1]; k++) {
+          // adj[k] are the neighbors of the third vertex,
+          // they can't be equal to first or the second.
+          if (adj[k] != adj[i] && adj[k] != first) {
+            for (int l = xadj[adj[k]]; l < xadj[adj[k] + 1]; l++) {
+              // adj[l] are the neighbors of the fourth vertex,
+              // they can't be equal to first second or the third.
+              if (adj[l] != adj[j] && adj[l] != adj[i] && adj[l] != first) {
+                for (int m = xadj[adj[l]]; m < xadj[adj[l] + 1]; m++) {
+                  // adj[l] are the neighbors of the fourth vertex,
+                  // they can't be equal to first second or the third.
+                  if (adj[m] == first)
+                    counter[threadIdx.x]++;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+__device__ void deviceDFSk4(int *xadj, int *adj, int *nov, int first,
+                            int *counter) {
+  // printf("my marked is at%p\n",(void *) marked);
+  for (int i = xadj[first]; i < xadj[first + 1]; i++) {
+    // adj[i] are the neighbors of first vertex, none can be first by
+    // definition (no loops of len-1)
+    for (int j = xadj[adj[i]]; j < xadj[adj[i] + 1]; j++) {
+      // adj[j] are the neighbors of the second vertex on this path,
+      // they can't be first.
+      if (adj[j] != first) {
+        for (int k = xadj[adj[j]]; k < xadj[adj[j] + 1]; k++) {
+          // adj[k] are the neighbors of the third vertex,
+          // they can't be equal to first or the second.
+          if (adj[k] != adj[i] && adj[k] != first) {
+            for (int l = xadj[adj[k]]; l < xadj[adj[k] + 1]; l++) {
+              // adj[l] are the neighbors of the fourth vertex,
+              if (adj[l] == first) {
+                counter[threadIdx.x]++;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+__device__ void deviceDFSk3(int *xadj, int *adj, int *nov, int first,
+                            int *counter) {
+  // printf("my marked is at%p\n",(void *) marked);
+  for (int i = xadj[first]; i < xadj[first + 1]; i++) {
+    // adj[i] are the neighbors of first vertex, none can be first by
+    // definition (no loops of len-1)
+    for (int j = xadj[adj[i]]; j < xadj[adj[i] + 1]; j++) {
+      // adj[j] are the neighbors of the second vertex on this path,
+      // they can't be first.
+      if (adj[j] != first) {
+        for (int k = xadj[adj[j]]; k < xadj[adj[j] + 1]; k++) {
+          // adj[k] are the neighbors of the third vertex,
+          if (adj[k] == first) {
+            counter[threadIdx.x]++;
+          }
+        }
+      }
     }
   }
 }
 
 __global__ void prep(int *xadj, int *adj, int *nov, int k, int max_k, int *ct) {
-
   int id = blockIdx.x * blockDim.x + threadIdx.x;
-  __shared__ int my_path[5*1024];//bitshift is better than multiplication, read it on a mark harris article
   __shared__ int my_ct[1024];
   if (id < *nov) {
-    my_ct[threadIdx.x]=0;
-    deviceDFS(xadj, adj, nov, k - 1, max_k, id,my_ct, id,my_path);
-    ct[id]=my_ct[threadIdx.x];//[threadIdx.x];
+    my_ct[threadIdx.x] = 0;
+    if (k == 5)
+      deviceDFSk5(xadj, adj, nov, id, my_ct);
+    else if (k == 4)
+      deviceDFSk4(xadj, adj, nov, id, my_ct);
+    else if (k == 3)
+      deviceDFSk3(xadj, adj, nov, id, my_ct);
+    ct[id] = my_ct[threadIdx.x];
   }
 }
 __global__ void setct(int *nov, int *ct) {
@@ -94,7 +152,8 @@ void wrapper(int *xadj, int *adj, int *nov, int nnz, int k) {
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
-  prep<<<(*nov + threads - 1) / threads, threads>>>(d_xadj, d_adj, d_nov, k, k, d_ct);
+  prep<<<(*nov + threads - 1) / threads, threads>>>(d_xadj, d_adj, d_nov, k, k,
+                                                    d_ct);
   gpuErrchk(cudaDeviceSynchronize());
   cudaEventCreate(&stop);
   cudaEventRecord(stop, 0);
@@ -149,12 +208,11 @@ void *read_edges(char *bin_name, int k) {
   bp.seekg(0);
   *no_vertices = max + 1;
   int no_edges = (number_of_lines)*2; // bidirectional
-  /*TODO unique and no loop decreases this, we should resize adj accordingly.
-   * Not the end of the world, we will never reach those indices.*/
+  /*TODO unique and no loop decreases this, we should resize adj
+   * accordingly. Not the end of the world, we will never reach those
+   * indices.*/
 
   // if file ended with \n you'd keep it as is.
-  // std::cout << "allocating A: " << sizeof(std::vector<int>) * *no_vertices
-  //          << "bytes. " << *no_vertices << " vectors." << std::endl;
 
   std::vector<int> *A = new std::vector<int>[*no_vertices];
   // std::cout << "allocated A" << std::endl;
@@ -180,8 +238,8 @@ void *read_edges(char *bin_name, int k) {
     // sort then unique.
     // you may have 3 1 and 1 3
     // if you do not sort, unique doesn't do what I think it would.
-    // also we prefer them sorted in case the file has 1 2 before 1 0 or sth.
-    // using default comparison:
+    // also we prefer them sorted in case the file has 1 2 before 1 0 or
+    // sth. using default comparison:
     std::vector<int>::iterator it;
     it = std::unique(A[i].begin(), A[i].end());   // 10 20 30 20 10 ?  ?  ?  ?
                                                   //                ^

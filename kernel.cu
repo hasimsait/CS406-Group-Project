@@ -3,7 +3,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
-
+#define THREADS 64
 // Error check-----
 #define gpuErrchk(ans)                                                         \
   { gpuAssert((ans), __FILE__, __LINE__); }
@@ -21,29 +21,36 @@ inline void gpuAssert(cudaError_t code, const char *file, int line,
 // you will not b Moreover, you may also want to look at how to use
 // cuda-memcheck and cuda-gdb for debuggin
 
-__device__ void deviceDFSk5(int *xadj, int *adj, int *nov, int first,
-                            int *counter) {
-  // printf("my marked is at%p\n",(void *) marked);
-  for (int i = xadj[first]; i < xadj[first + 1]; i++) {
-    // adj[i] are the neighbors of first vertex, none can be first by definition
-    // (no loops of len-1)
-    for (int j = xadj[adj[i]]; j < xadj[adj[i] + 1]; j++) {
-      // adj[j] are the neighbors of the second vertex on this path,
-      // they can't be first.
-      if (adj[j] != first) {
-        for (int k = xadj[adj[j]]; k < xadj[adj[j] + 1]; k++) {
-          // adj[k] are the neighbors of the third vertex,
-          // they can't be equal to first or the second.
-          if (adj[k] != adj[i] && adj[k] != first) {
-            for (int l = xadj[adj[k]]; l < xadj[adj[k] + 1]; l++) {
-              // adj[l] are the neighbors of the fourth vertex,
-              // they can't be equal to first second or the third.
-              if (adj[l] != adj[j] && adj[l] != adj[i] && adj[l] != first) {
-                for (int m = xadj[adj[l]]; m < xadj[adj[l] + 1]; m++) {
+__global__ void deviceDFSk5(int *xadj, int *adj, int *nov, int *counter) {
+  int id = blockIdx.x * blockDim.x + threadIdx.x;
+  __shared__ int ct[THREADS];
+  if (id < *nov) {
+    ct[threadIdx.x] = 0;
+    for (int i = xadj[id]; i < xadj[id + 1]; i++) {
+      // adj[i] are the neighbors of id vertex, none can be id by
+      // definition (no loops of len-1)
+      if (adj[i] != id) {
+        for (int j = xadj[adj[i]]; j < xadj[adj[i] + 1]; j++) {
+          // adj[j] are the neighbors of the second vertex on this path,
+          // they can't be id.
+          if (adj[j] != adj[i] && adj[j] != id) {
+            for (int k = xadj[adj[j]]; k < xadj[adj[j] + 1]; k++) {
+              // adj[k] are the neighbors of the third vertex,
+              // they can't be equal to id or the second.
+              if (adj[k] != adj[j] && adj[k] != adj[i] && adj[k] != id) {
+                for (int l = xadj[adj[k]]; l < xadj[adj[k] + 1]; l++) {
                   // adj[l] are the neighbors of the fourth vertex,
-                  // they can't be equal to first second or the third.
-                  if (adj[m] == first)
-                    counter[threadIdx.x]++;
+                  // they can't be equal to id second or the third.
+                  if (adj[l] != adj[k] && adj[l] != adj[j] &&
+                      adj[l] != adj[i] && adj[l] != id) {
+                    for (int m = xadj[adj[l]]; m < xadj[adj[l] + 1]; m++) {
+                      // adj[l] are the neighbors of the fourth vertex,
+                      // they can't be equal to id second or the third.
+                      if (adj[m] == id) {
+                        ct[threadIdx.x]++;
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -51,27 +58,56 @@ __device__ void deviceDFSk5(int *xadj, int *adj, int *nov, int first,
         }
       }
     }
+    counter[id] = ct[threadIdx.x];
   }
 }
 
-__device__ void deviceDFSk4(int *xadj, int *adj, int *nov, int first,
-                            int *counter) {
-  // printf("my marked is at%p\n",(void *) marked);
-  for (int i = xadj[first]; i < xadj[first + 1]; i++) {
-    // adj[i] are the neighbors of first vertex, none can be first by
-    // definition (no loops of len-1)
-    for (int j = xadj[adj[i]]; j < xadj[adj[i] + 1]; j++) {
-      // adj[j] are the neighbors of the second vertex on this path,
-      // they can't be first.
-      if (adj[j] != first) {
-        for (int k = xadj[adj[j]]; k < xadj[adj[j] + 1]; k++) {
-          // adj[k] are the neighbors of the third vertex,
-          // they can't be equal to first or the second.
-          if (adj[k] != adj[i] && adj[k] != first) {
-            for (int l = xadj[adj[k]]; l < xadj[adj[k] + 1]; l++) {
-              // adj[l] are the neighbors of the fourth vertex,
-              if (adj[l] == first) {
-                counter[threadIdx.x]++;
+__global__ void deviceDFSk4(int *xadj, int *adj, int *nov, int *counter) {
+  int id = blockIdx.x * blockDim.x + threadIdx.x;
+  __shared__ int ct[THREADS];
+  if (id < *nov) {
+    ct[threadIdx.x] = 0;
+    for (int i = xadj[id]; i < xadj[id + 1]; i++) {
+      // adj[i] are the neighbors of id vertex, none can be id by
+      // definition (no loops of len-1)
+      if (adj[i] != id) {
+        for (int j = xadj[adj[i]]; j < xadj[adj[i] + 1]; j++) {
+          // adj[j] are the neighbors of the second vertex on this path,
+          // they can't be id.
+          if (adj[j] != adj[i] && adj[j] != id) {
+            for (int k = xadj[adj[j]]; k < xadj[adj[j] + 1]; k++) {
+              // adj[k] are the neighbors of the third vertex,
+              // they can't be equal to id or the second.
+              if (adj[k] != adj[j] && adj[k] != adj[i] && adj[k] != id) {
+                for (int l = xadj[adj[k]]; l < xadj[adj[k] + 1]; l++) {
+                  // adj[l] are the neighbors of the fourth vertex,
+                  if (adj[l] == id) {
+                    ct[threadIdx.x]++;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    counter[id] = ct[threadIdx.x];
+  }
+}
+
+__global__ void deviceDFSk3(int *xadj, int *adj, int *nov, int *counter) {
+  int id = blockIdx.x * blockDim.x + threadIdx.x;
+  if (id < *nov) {
+
+    for (int i = xadj[id]; i < xadj[id + 1]; i++) {
+      if (adj[i] > id) {
+        for (int j = xadj[adj[i]]; j < xadj[adj[i] + 1]; j++) {
+          if (adj[j] > adj[i] && adj[j] > id) {
+            for (int k = xadj[adj[j]]; k < xadj[adj[j] + 1]; k++) {
+              if (adj[k] == id) {
+                atomicAdd(&counter[id], 2);
+                atomicAdd(&counter[adj[i]], 2);
+                atomicAdd(&counter[adj[j]], 2);
               }
             }
           }
@@ -81,47 +117,6 @@ __device__ void deviceDFSk4(int *xadj, int *adj, int *nov, int first,
   }
 }
 
-__device__ void deviceDFSk3(int *xadj, int *adj, int *nov, int first,
-                            int *counter) {
-  // printf("my marked is at%p\n",(void *) marked);
-  for (int i = xadj[first]; i < xadj[first + 1]; i++) {
-    // adj[i] are the neighbors of first vertex, none can be first by
-    // definition (no loops of len-1)
-    for (int j = xadj[adj[i]]; j < xadj[adj[i] + 1]; j++) {
-      // adj[j] are the neighbors of the second vertex on this path,
-      // they can't be first.
-      if (adj[j] != first) {
-        for (int k = xadj[adj[j]]; k < xadj[adj[j] + 1]; k++) {
-          // adj[k] are the neighbors of the third vertex,
-          if (adj[k] == first) {
-            counter[threadIdx.x]++;
-          }
-        }
-      }
-    }
-  }
-}
-
-__global__ void prep(int *xadj, int *adj, int *nov, int k, int max_k, int *ct) {
-  int id = blockIdx.x * blockDim.x + threadIdx.x;
-  __shared__ int my_ct[1024];
-  if (id < *nov) {
-    my_ct[threadIdx.x] = 0;
-    if (k == 5)
-      deviceDFSk5(xadj, adj, nov, id, my_ct);
-    else if (k == 4)
-      deviceDFSk4(xadj, adj, nov, id, my_ct);
-    else if (k == 3)
-      deviceDFSk3(xadj, adj, nov, id, my_ct);
-    ct[id] = my_ct[threadIdx.x];
-  }
-}
-__global__ void setct(int *nov, int *ct) {
-  int id = blockIdx.x * blockDim.x + threadIdx.x;
-  if (id < *nov) {
-    ct[id] = 0;
-  }
-}
 void wrapper(int *xadj, int *adj, int *nov, int nnz, int k) {
   cudaSetDevice(0);
   int *d_xadj;
@@ -133,27 +128,33 @@ void wrapper(int *xadj, int *adj, int *nov, int nnz, int k) {
   cudaMalloc((void **)&d_adj, nnz * sizeof(int));
   cudaMalloc((void **)&d_nov, sizeof(int));
   cudaMalloc((void **)&d_ct, (*nov) * sizeof(int));
-
+  if (k == 3) {
+    /*not that necessary, to ensure d_ct is set to zero in the least amount of
+     * lines possible for k=3*/
+    memset(ct, 0, (*nov) * sizeof(int));
+    cudaMemcpy(d_ct, ct, (*nov) * sizeof(int), cudaMemcpyHostToDevice);
+  }
   cudaMemcpy(d_xadj, xadj, (*nov + 1) * sizeof(int), cudaMemcpyHostToDevice);
   cudaMemcpy(d_adj, adj, (nnz) * sizeof(int), cudaMemcpyHostToDevice);
   cudaMemcpy(d_nov, nov, sizeof(int), cudaMemcpyHostToDevice);
 
-  cudaDeviceProp prop;
-  cudaGetDeviceProperties(&prop, 0);
-  unsigned int threads = prop.maxThreadsPerBlock;
-  std::cout << "Device Properties" << std::endl;
-  std::cout << "The threads: " << threads << std::endl;
   gpuErrchk(cudaDeviceSynchronize());
 #ifdef DEBUG
   std::cout << "malloc copy done" << std::endl;
 #endif
-  setct<<<(*nov + threads - 1) / threads, threads>>>(d_nov, d_ct);
   gpuErrchk(cudaDeviceSynchronize());
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
-  prep<<<(*nov + threads - 1) / threads, threads>>>(d_xadj, d_adj, d_nov, k, k,
-                                                    d_ct);
+  if (k == 3)
+    deviceDFSk3<<<(*nov + THREADS - 1) / THREADS, THREADS>>>(d_xadj, d_adj,
+                                                             d_nov, d_ct);
+  if (k == 4)
+    deviceDFSk4<<<(*nov + THREADS - 1) / THREADS, THREADS>>>(d_xadj, d_adj,
+                                                             d_nov, d_ct);
+  if (k == 5)
+    deviceDFSk5<<<(*nov + THREADS - 1) / THREADS, THREADS>>>(d_xadj, d_adj,
+                                                             d_nov, d_ct);
   gpuErrchk(cudaDeviceSynchronize());
   cudaEventCreate(&stop);
   cudaEventRecord(stop, 0);
@@ -163,7 +164,7 @@ void wrapper(int *xadj, int *adj, int *nov, int nnz, int k) {
     printf("%d %d\n", i, ct[i]);
   float elapsedTime;
   cudaEventElapsedTime(&elapsedTime, start, stop);
-  printf("GPU scale took: %f s\n", elapsedTime / 1000);
+  printf("GPU took: %f s\n", elapsedTime / 1000);
   cudaFree(d_xadj);
   cudaFree(d_adj);
   cudaFree(d_nov);

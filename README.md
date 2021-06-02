@@ -30,17 +30,20 @@ Onur Arda Bodur
 | amazon      | 5 |  10.5503   |  5.97017   |  3.02007   |  1.58916   |  0.838295   |  57.700562  |
 | dblp        | 3 |  0.495958  |  0.356659  |  0.257321  |  0.165979  |  0.109911   |  2.025606   |
 | dblp        | 4 |  12.0967   |  8.18795   |  6.58545   |  5.35292   |  4.64312    |  191.320938 |        
-| dblp        | 5 |  629.311   |  514.97    |  584.028   |  546.786   |  482.425    |  >600       |
+| dblp        | 5 |  629.311   |  514.97    |  584.028   |  546.786   |  482.425    |  >1200      |
 
-## Results on provided graphs after passing one path per thread only in Cuda
-| instance    | k | sequential | OpenMP t=2 | OpenMP t=4 | OpenMP t=8 | OpenMP t=16 | Cuda        |
-| ----------- | - | ---------- | ---------- | ---------- | ---------- | ----------- | ----------- |
-| amazon      | 3 |  0.279555  |  0.194179  |  0.133981  |  0.0905637 |  0.0699001  |  0.279176   |
-| amazon      | 4 |  1.64887   |  0.915767  |  0.513519  |  0.301799  |  0.173176   |  3.601732   |
-| amazon      | 5 |  10.5503   |  5.97017   |  3.02007   |  1.58916   |  0.838295   |  54.977879  |
-| dblp        | 3 |  0.495958  |  0.356659  |  0.257321  |  0.165979  |  0.109911   |  1.975520   |
-| dblp        | 4 |  12.0967   |  8.18795   |  6.58545   |  5.35292   |  4.64312    |  188.793884 |        
-| dblp        | 5 |  629.311   |  514.97    |  584.028   |  546.786   |  482.425    |  >600       |
+## Cuda results on provided graphs after passing one path per thread only
+| instance    | k |  local/global path |  shared path and counter |
+| ----------- | - | ------------------ | ------------------------ |
+| amazon      | 3 |  0.279176          |  0.216811                |
+| amazon      | 4 |  3.601732          |  3.115706                |
+| amazon      | 5 |  54.977879         |  48.157932               |
+| dblp        | 3 |  1.975520          |  1.929673                |
+| dblp        | 4 |  188.793884        |  188.082703              |       
+| dblp        | 5 |  >1200             |  >1200                   |
+
+The local and global memory accesses are around the same as excepted therefore the differences were within margin of error.<br>
+Increasing stride of shared path or counter increases the time. I tought the malloc would have a larger impact.
 
 *stride=1, once you take the transpose of the adj and a, it will speed up significantly. This DFS approach is limited on gpus as it causes significant divergence. When you have a certain amount of iterations of the for loop that performs the recursive call instead of xadj[i+1]-xadj[i], the performance will improve. The representation that provides stride also reduces the divergence significantly.
 

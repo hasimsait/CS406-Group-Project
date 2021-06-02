@@ -33,14 +33,14 @@ Onur Arda Bodur
 | dblp        | 5 |  629.311   |  514.97    |  584.028   |  546.786   |  482.425    |  >1200      |
 
 ## Cuda results on provided graphs after passing one path per thread only
-| instance    | k |  local/global path |  shared path and counter |no recursion|
-| ----------- | - | ------------------ | ------------------------ | ---------- |
-| amazon      | 3 |  0.279176          |  0.216811                |  0.098119  |
-| amazon      | 4 |  3.601732          |  3.115706                |  1.340244  |
-| amazon      | 5 |  54.977879         |  48.157932               |  18.542461 |
-| dblp        | 3 |  1.975520          |  1.929673                |  0.942191  |
-| dblp        | 4 |  188.793884        |  188.082703              |  84.935524 |   
-| dblp        | 5 |  >1200             |  >1200                   |  >1200     |
+| instance    | k |  local/global path |  shared path and counter |no recursion| unfold and >start | multiple counters then reduce |
+| ----------- | - | ------------------ | ------------------------ | ---------- | ----------------- | ----------------------------- |
+| amazon      | 3 |  0.279176          |  0.216811                |  0.098119  |  0.071492         |
+| amazon      | 4 |  3.601732          |  3.115706                |  1.340244  |  1.143491         |
+| amazon      | 5 |  54.977879         |  48.157932               |  18.542461 |  12.318878        |
+| dblp        | 3 |  1.975520          |  1.929673                |  0.942191  |  0.684884         |
+| dblp        | 4 |  188.793884        |  188.082703              |  84.935524 |  138.882248       |
+| dblp        | 5 |  >1200             |  >1200                   |  >1200     |  >1200            |
 
 The local and global memory accesses are around the same as excepted therefore the differences were within margin of error.<br>
 Increasing stride of shared path or counter increases the time. I tought the malloc would have a larger impact.

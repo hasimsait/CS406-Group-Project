@@ -30,32 +30,28 @@ __device__ bool device_contains(int *array, int start, int end, int item) {
 }
 __device__ void deviceDFS(int *xadj, int *adj, int *nov, int k, int max_k,
                           int vertex, int *counter, int start, int *my_path) {
-  my_path[(threadIdx.x*5)+max_k - k - 1] = vertex;
+  // printf("DFS on %d at k %d\n",vertex,k);
+  my_path[max_k - k - 1] = vertex;
   // for(int i=0; i<max_k-k;i++)
   // printf("path element %d is %d\n",i,my_path[i]);
   if (k == 0) {
     if (device_contains(adj, xadj[vertex], xadj[vertex + 1], start))
-      //atomicAdd(&counter[start], 1);
-      counter[threadIdx.x]++;
+      atomicAdd(&counter[start], 1);
     return;
   }
   // printf("my marked is at%p\n",(void *) marked);
   for (int j = xadj[vertex]; j < xadj[vertex + 1]; j++) {
-    if (!device_contains(my_path+(threadIdx.x*5), 0, max_k - k, adj[j])) {
+    // if (!device_contains(my_path, 0, max_k - k, adj[j])) {
       deviceDFS(xadj, adj, nov, k - 1, max_k, adj[j], counter, start, my_path);
     }
   }
 }
-
 __global__ void prep(int *xadj, int *adj, int *nov, int k, int max_k, int *ct) {
-
   int id = blockIdx.x * blockDim.x + threadIdx.x;
-  __shared__ int my_path[5*1024];//bitshift is better than multiplication, read it on a mark harris article
-  __shared__ int my_ct[1024];
   if (id < *nov) {
-    my_ct[threadIdx.x]=0;
-    deviceDFS(xadj, adj, nov, k - 1, max_k, id,my_ct, id,my_path);
-    ct[id]=my_ct[threadIdx.x];//[threadIdx.x];
+    // int* my_path= new int[k];
+    int my_path[6];
+    deviceDFS(xadj, adj, nov, k - 1, max_k, id, ct, id, my_path);
   }
 }
 __global__ void setct(int *nov, int *ct) {
@@ -94,7 +90,8 @@ void wrapper(int *xadj, int *adj, int *nov, int nnz, int k) {
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
-  prep<<<(*nov + threads - 1) / threads, threads>>>(d_xadj, d_adj, d_nov, k, k, d_ct);
+  prep<<<(*nov + threads - 1) / threads, threads>>>(d_xadj, d_adj, d_nov, k, k,
+                                                    d_ct);
   gpuErrchk(cudaDeviceSynchronize());
   cudaEventCreate(&stop);
   cudaEventRecord(stop, 0);

@@ -15,9 +15,9 @@ Onur Arda Bodur
     module unload cuda/10.0
     module unload gcc/7.5.0
     module load gcc/8.2.0 #the latest version you have installed
-    g++ counter_implemented.cpp -O3 -fopenmp -o cpu
+    g++ main.cpp -O3 -fopenmp -o cpu
     export OMP_NUM_THREADS=thread_count;
-	#(decomment lines 267 and 311 to print output, just timing will be printed otherwise)
+	#(decomment lines 107 and 150 to print output, only the timing will be printed otherwise)
     ./gpu filename k
     ./cpu filename k
     

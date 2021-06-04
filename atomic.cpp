@@ -49,6 +49,7 @@ void DFS(int *xadj, int *adj, int *nov, bool *marked, int k, int vertex,
     if (contains(adj, xadj[vertex], xadj[vertex + 1], start)) {
       // std::cout << "count incremented";
       for (int i = 0; i < level + 1; i++) {
+        #pragma omp atomic
         counter[path[i]]++;
       }
       return;
@@ -116,7 +117,7 @@ int parallel_k3_unfold(int *xadj, int *adj, int *nov, int k) {
   int *count_ = new int[*nov];
   memset(count_, 0, sizeof(int) * (*nov));
   start = omp_get_wtime();
-  #pragma omp parallel reduction(+:count_[:*nov])
+  #pragma omp parallel
   {
     #pragma omp single
       std::cout << "Number of threads: " << omp_get_num_threads() << "\n";
@@ -154,19 +155,19 @@ int parallel_k3_unfold(int *xadj, int *adj, int *nov, int k) {
             << " seconds." << std::endl;
 
   // decomment for output
-  // for(int i = 0;i<*nov;i++){
-  // std::cout <<  i << " "<<(count_[i]) << std::endl;
-  //}
+   for(int i = 0;i<*nov;i++){
+     std::cout <<  i << " "<<(count_[i]) << std::endl;
+   }
 
   return (ct / 2) * k;
 }
 
 int parallel_k4_unfold(int *xadj, int *adj, int *nov, int k) {
-  return 0;
+    return 0;
 }
 
 int parallel_k5_unfold(int *xadj, int *adj, int *nov, int k) {
-  return 0;
+    return 0;
 }
 
 int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
@@ -177,7 +178,7 @@ int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
   int *count_ = new int[*nov];
   memset(count_, 0, sizeof(int) * (*nov));
   start = omp_get_wtime();
-  #pragma omp parallel reduction(+:count_[:*nov])
+  #pragma omp parallel
   {
     #pragma omp single
       std::cout << "Number of threads: " << omp_get_num_threads() << "\n";
@@ -303,7 +304,6 @@ void *read_edges(char *bin_name, int k) {
   // std::cout << "Done reading." << std::endl;
   //sequential_k_cycles(xadj, adj, no_vertices, k);
   parallel_k_cycles(xadj, adj, no_vertices, k);
-  //parallel_k3_unfold(xadj, adj, no_vertices, k);
   // BFS_driver(xadj, adj, no_vertices, k);
   // parallel_BFS_driver(xadj, adj, no_vertices, k);
   return 0;

@@ -97,7 +97,6 @@ int sequential_k_cycles(int *xadj, int *adj, int *nov, int k) {
     // will not be visited again.
     marked[i] = true;
   }
-  /*the contributes line mentions this*/
   double end = omp_get_wtime();
   std::cout << "Total cycles of length " << k << " took " << end - start
             << " seconds." << std::endl;
@@ -198,7 +197,6 @@ int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
         // count_[i] = ct;
         // ct=0;
       }
-    /*the contributes line mentions this*/
   }
   int sum = 0;
   end = omp_get_wtime();

@@ -147,10 +147,9 @@ int parallel_k_cycles(int *xadj, int *adj, int *nov, int k) {
   std::cout << "Total cycles of length " << k << " took " << end - start
             << " seconds." << std::endl;
 
-  // decomment for output
-  // for(int i = 0;i<*nov;i++){
-  // std::cout <<  i << " "<<(count_[i]) << std::endl;
-  //}
+  for(int i = 0;i<*nov;i++){
+    std::cout <<  i << " "<<(count_[i]) << std::endl;
+  }
 
   return (ct / 2) * k;
 }
